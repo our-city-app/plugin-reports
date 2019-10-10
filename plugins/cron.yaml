@@ -1,0 +1,4 @@
+cron:
+- description: Cleanup timed out reports
+  url: /admin/cron/reports/cleanup/timed_out
+  schedule: every day 00:00
