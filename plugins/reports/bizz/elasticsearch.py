@@ -184,7 +184,7 @@ def _search(lat, lon, distance, status, cursor, limit, is_new=False):
         ]
     }
 
-    # todo fix status
+    # todo fix status in search
 
     base_url, es_user, es_passwd = get_elasticsearch_config()
 

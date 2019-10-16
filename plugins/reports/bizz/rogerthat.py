@@ -24,15 +24,18 @@ from plugins.rogerthat_api.to.messaging import AnswerTO, Message
 
 
 @returns(unicode)
-@arguments(sik=unicode, member=MemberTO, message=unicode, answers=(None, [AnswerTO]), flags=(int, long), json_rpc_id=unicode)
-def send_rogerthat_message(sik, member, message, answers=None, flags=None, json_rpc_id=None):
+@arguments(sik=unicode, member=MemberTO, message=unicode, answers=(None, [AnswerTO]), flags=(int, long),
+           parent_message_key=unicode, json_rpc_id=unicode)
+def send_rogerthat_message(sik, member, message, answers=None, flags=None,
+                           parent_message_key=None, json_rpc_id=None):
     rt_settings = RogerthatSettings.create_key(sik).get()
+
     flags = flags if flags is not None else Message.FLAG_AUTO_LOCK
     if not answers:
         flags = flags | Message.FLAG_ALLOW_DISMISS
         answers = []
     return messaging.send(api_key=rt_settings.api_key,
-                          parent_message_key=None,
+                          parent_message_key=parent_message_key,
                           members=[member],
                           message=message,
                           answers=answers or [],

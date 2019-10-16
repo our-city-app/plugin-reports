@@ -35,8 +35,7 @@ def create_incident(settings, rt_user, incident, steps):
     xml_content = create_incident_xml(incident, rt_user, steps)
     if DEBUG:
         logging.warn(xml_content)
-    # todo settings.gcs_bucket_name
-    deferred.defer(create_incident_on_gcs, settings.gcs_bucket_name, incident.incident_id, xml_content, _queue=INCIDENTS_QUEUE)
+    deferred.defer(create_incident_on_gcs, settings.params['bucket_name'], incident.incident_id, xml_content, _queue=INCIDENTS_QUEUE)
 
     title = description = lat = lon = None
     return {}, title, description, lat, lon
@@ -146,7 +145,7 @@ def create_incident_on_gcs(gcs_bucket_name, incident_id, xml_content, attempt=1)
 
 
 def incident_follow_up(from_, regex, subject, body):
-    # todo security validate from
+    # todo-later security validate from
     incident_id = long(regex.groupdict()['incident_id'])
     incident = get_incident(incident_id)
     if not incident:

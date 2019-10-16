@@ -129,7 +129,7 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
 
 
 def incident_follow_up(from_, regex, subject, body):
-    # todo security validate from
+    # todo-later security validate from
     incident_id = long(regex.groupdict()['incident_id'])
     incident = get_incident(incident_id)
     if not incident:
@@ -137,4 +137,7 @@ def incident_follow_up(from_, regex, subject, body):
         return
     rt_user = get_rogerthat_user(incident.user_id)
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
-    deferred.defer(send_rogerthat_message, incident.sik, member, body, json_rpc_id=guid())
+    parent_message_key = incident.params.get('parent_message_key')
+    deferred.defer(send_rogerthat_message, incident.sik, member, body,
+                   parent_message_key=parent_message_key,
+                   json_rpc_id=guid())

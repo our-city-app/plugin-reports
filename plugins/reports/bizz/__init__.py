@@ -78,7 +78,7 @@ def get_vote_options(vote, user_vote):
 
 
 def convert_to_item_to(m):
-    icon_id = 'todo'
+    icon_id = 'other'
     icon_color = '#263583'
 
     return MapItemTO(id=m.uid,

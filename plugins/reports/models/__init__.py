@@ -171,19 +171,3 @@ class UserIncidentVote(NdbModel):
     @classmethod
     def create_key(cls, user_id, incident_id):
         return ndb.Key(cls, incident_id, parent=cls.create_parent_key(user_id))
-
-# todo migration
-# we need to map every old incident to a new incident so that status updates keep working
-# we can't use the same id's because topdesk and 3p will have some mutual incident id's
-
-# todo specs
-# when will an item be removed
-# create dashboard for the city where they can hide/show/update status/merge incidents
-
-# todo topdesk client & i18n
-
-# todo map filters/statuses ??
-# new, planned, in progress, extra info required, waiting for supplier, on hold, closed, completed
-
-# todo are votes updateable??
-# todo has every report a vote button ? and will it always be pos/neg?
