@@ -24,6 +24,7 @@ from plugins.rogerthat_api.to import UserDetailsTO
 from plugins.rogerthat_api.to.messaging.service_callback_results import FlowMemberResultCallbackResultTO
 
 FMR_TAG_MAPPING = {
+    'meldings-kaart': process_incident,
     'meldingskaart': process_incident
 }
 

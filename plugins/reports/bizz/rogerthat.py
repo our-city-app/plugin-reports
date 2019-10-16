@@ -17,7 +17,6 @@
 
 from mcfw.cache import cached
 from mcfw.rpc import returns, arguments
-from plugins.reports.dal import get_integration_settings
 from plugins.rogerthat_api.api import messaging, system
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 from plugins.rogerthat_api.to import MemberTO
@@ -28,8 +27,6 @@ from plugins.rogerthat_api.to.messaging import AnswerTO, Message
 @arguments(sik=unicode, member=MemberTO, message=unicode, answers=(None, [AnswerTO]), flags=(int, long), json_rpc_id=unicode)
 def send_rogerthat_message(sik, member, message, answers=None, flags=None, json_rpc_id=None):
     rt_settings = RogerthatSettings.create_key(sik).get()
-    settings = get_integration_settings(sik)
-
     flags = flags if flags is not None else Message.FLAG_AUTO_LOCK
     if not answers:
         flags = flags | Message.FLAG_ALLOW_DISMISS
@@ -41,7 +38,7 @@ def send_rogerthat_message(sik, member, message, answers=None, flags=None, json_
                           answers=answers or [],
                           flags=flags,
                           alert_flags=Message.ALERT_FLAG_VIBRATE,
-                          branding=settings.rogerthat_branding_key,  # todo implement
+                          branding=get_main_branding_hash(rt_settings.api_key),
                           tag=None,
                           json_rpc_id=json_rpc_id)
 
