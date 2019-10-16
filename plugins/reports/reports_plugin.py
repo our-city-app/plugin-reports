@@ -22,7 +22,11 @@ from framework.utils.plugins import Handler
 from mcfw.consts import DEBUG
 from mcfw.rpc import parse_complex_value
 from plugins.reports import rogerthat_callbacks
+from plugins.reports.bizz.rtemail import EmailHandler
+from plugins.reports.handlers import ReportItemsHandler, \
+    ReportItemDetailsHandler, ReportItemsVoteHandler
 from plugins.reports.handlers.cron import ReportsCleanupTimedOutHandler
+from plugins.reports.integrations.int_topdesk.handlers import TopdeskCallbackHandler
 from plugins.reports.to import ReportsPluginConfiguration
 from plugins.rogerthat_api.rogerthat_api_plugin import RogerthatApiPlugin
 
@@ -39,5 +43,11 @@ class ReportsPlugin(Plugin):
         rogerthat_api_plugin.subscribe('messaging.flow_member_result', rogerthat_callbacks.flow_member_result)
 
     def get_handlers(self, auth):
+        if auth == Handler.AUTH_UNAUTHENTICATED:
+            yield Handler(url='/plugins/reports/topdesk/callback_api', handler=TopdeskCallbackHandler)
+            yield Handler(url='/plugins/reports/items', handler=ReportItemsHandler)
+            yield Handler(url='/plugins/reports/items/detail', handler=ReportItemDetailsHandler)
+            yield Handler(url='/plugins/reports/items/vote', handler=ReportItemsVoteHandler)
         if auth == Handler.AUTH_ADMIN:
+            yield Handler(url='/_ah/mail/<email:.*>', handler=EmailHandler)
             yield Handler(url='/admin/cron/reports/cleanup/timed_out', handler=ReportsCleanupTimedOutHandler)

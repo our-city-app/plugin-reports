@@ -21,10 +21,18 @@ import logging
 from google.appengine.ext import ndb, deferred
 
 from framework.bizz.job import run_job
-from mcfw.rpc import returns, arguments
+from framework.utils import guid
+from mcfw.properties import object_factory
+from mcfw.rpc import returns, arguments, parse_complex_value
 from plugins.reports.bizz.elasticsearch import delete_docs
-from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user
-from plugins.reports.models import Incident
+from plugins.reports.bizz.rogerthat import send_rogerthat_message
+from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, \
+    get_integration_settings, get_incident
+from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
+from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
+from plugins.reports.models import Incident, IntegrationSettings
+from plugins.rogerthat_api.to import MemberTO
+from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_MAPPING
 
 
 def cleanup_timed_out():
@@ -80,5 +88,53 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
     if not rt_user:
         logging.error('Could not find user with id %s' % (user_id))
         return
-    
+
+    settings = get_integration_settings(sik)
+    if not settings:
+        logging.error('Could not find integration settings for %s' % (sik))
+        return
+
     # todo implement
+
+    incident = Incident(key=Incident.create_key(incident_id))
+    incident.sik = sik
+    incident.user_id = user_id
+    incident.report_time = datetime.utcfromtimestamp(timestamp)
+    incident.resolve_time = None
+    incident.visible = False
+    incident.cleanup_time = None
+    incident.search_keys = []
+    incident.integration = settings.integration
+    incident.params = {'source': 'app',
+                       'parent_message_key': parent_message_key,
+                       'steps': steps}
+
+    parsed_steps = parse_complex_value(object_factory("step_type", FLOW_STEP_MAPPING), steps, True)
+    if settings.integration == IntegrationSettings.INT_TOPDESK:
+        params, title, description, lat, lon = create_topdesk_incident(settings, rt_user, incident, parsed_steps)
+    elif settings.integration == IntegrationSettings.INT_3P:
+        params, title, description, lat, lon = create_3p_incident(settings, rt_user, incident, parsed_steps)
+    else:
+        params = None
+        title = description = lat = lon = None
+    if params:
+        incident.params.update(params)
+    incident.title = title
+    incident.description = description
+    if lat and lon:
+        incident.geo_location = ndb.GeoPt(lat, lon)
+    else:
+        incident.geo_location = None
+    incident.put()
+
+
+def incident_follow_up(from_, regex, subject, body):
+    # todo security validate from
+    incident_id = long(regex.groupdict()['incident_id'])
+    incident = get_incident(incident_id)
+    if not incident:
+        logging.debug("Recieved incident update that is not in our database: '%s'" % (incident_id))
+        return
+    rt_user = get_rogerthat_user(incident.user_id)
+    member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
+    deferred.defer(send_rogerthat_message, incident.sik, member, body, json_rpc_id=guid())

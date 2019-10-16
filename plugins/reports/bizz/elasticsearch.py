@@ -18,10 +18,12 @@
 import base64
 import json
 import logging
+import time
 
 from google.appengine.api import urlfetch
+from google.appengine.ext import ndb
 
-from plugins.reports.models import ElasticsearchSettings
+from plugins.reports.models import ElasticsearchSettings, Incident
 
 
 def get_elasticsearch_config():
@@ -56,18 +58,6 @@ def create_index():
             "properties": {
                 "location": {
                     "type": "geo_point"
-                },
-                "start_date": {
-                    "type": "date",
-                    "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
-                },
-                "end_date": {
-                    "type": "date",
-                    "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
-                },
-                "time_frame": {
-                    "type": "date_range",
-                    "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
                 }
             }
         }
@@ -119,8 +109,40 @@ def index_doc(uid, data):
         raise Exception('Failed to create index %s', uid)
 
 
+def search_current(lat, lon, distance, status, cursor=None, limit=10):
+    from plugins.reports.bizz import convert_to_item_tos
+    from plugins.reports.integrations.int_topdesk.importer import FakeTopdeskIncident
+    start_time = time.time()
+    new_cursor, result_data = _search(lat, lon, distance, status, cursor, limit, is_new=False)
+    took_time = time.time() - start_time
+    logging.info('debugging.search_current _search {0:.3f}s'.format(took_time))
+    keys = set()
 
-def _search(lat, lon, distance, start, end, cursor, limit, is_new=False):
+    start_time = time.time()
+    for hit in result_data['hits']['hits']:
+        uid = hit['_id']
+        keys.add(FakeTopdeskIncident.create_key(uid))
+
+    took_time = time.time() - start_time
+    logging.info('debugging.search_current hits {0:.3f}s'.format(took_time))
+
+    if keys:
+        start_time = time.time()
+        models = ndb.get_multi(keys)
+        took_time = time.time() - start_time
+        logging.info('debugging.search_current ndb.get_multi {0:.3f}s'.format(took_time))
+
+        start_time = time.time()
+        items = convert_to_item_tos(models)
+        took_time = time.time() - start_time
+        logging.info('debugging.search_current convert_to_item_tos {0:.3f}s'.format(took_time))
+    else:
+        items = []
+
+    return items, new_cursor
+
+
+def _search(lat, lon, distance, status, cursor, limit, is_new=False):
     # we can only fetch up to 10000 items with from param
     start_offset = long(cursor) if cursor else 0
 
@@ -161,33 +183,8 @@ def _search(lat, lon, distance, start, end, cursor, limit, is_new=False):
             }
         ]
     }
-    if is_new:
-        d['query']['bool']['filter'].append({
-            "range": {
-                "start_date" : {
-                    "gte" : start,
-                    "lt" : end,
-                    "relation" : "within"
-                 }
-            }
-        })
-    else:
-        if start and end:
-            tf = {
-                "gte" : start,
-                "lte" : end,
-                "relation" : "intersects"
-            }
-        else:
-            tf = {
-                "gte" : start,
-                "relation" : "intersects"
-            }
-        d['query']['bool']['filter'].append({
-            "range": {
-                "time_frame" : tf
-            }
-        })
+
+    # todo fix status
 
     base_url, es_user, es_passwd = get_elasticsearch_config()
 

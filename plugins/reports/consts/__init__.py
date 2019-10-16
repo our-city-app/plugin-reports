@@ -18,3 +18,4 @@
 from __future__ import unicode_literals
 
 NAMESPACE = 'reports'
+INCIDENTS_QUEUE = 'incidents-queue'

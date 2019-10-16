@@ -1,0 +1,3 @@
+queue:
+- name: incidents-queue
+  rate: 20/s

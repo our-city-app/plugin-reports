@@ -18,7 +18,7 @@
 from google.appengine.ext import ndb
 
 from framework.models.common import NdbModel
-from plugins.reports.plugin_consts import NAMESPACE
+from plugins.reports.consts import NAMESPACE
 
 
 class ElasticsearchSettings(NdbModel):
@@ -37,7 +37,12 @@ class ElasticsearchSettings(NdbModel):
 class IntegrationSettings(NdbModel):
     NAMESPACE = NAMESPACE
 
-    data = ndb.JsonProperty()
+    INT_NONE = u'none'
+    INT_TOPDESK = u'topdesk'
+    INT_3P = u'3p'
+
+    integration = ndb.StringProperty(indexed=False)
+    params = ndb.JsonProperty(indexed=False)
 
 # mutual
 #     rogerthat_branding_key = ndb.StringProperty(indexed=False)
@@ -63,7 +68,24 @@ class IntegrationSettings(NdbModel):
         return ndb.Key(cls, sik, namespace=NAMESPACE)
 
 
+class Consumer(NdbModel):
+    NAMESPACE = NAMESPACE
+
+    ref = ndb.StringProperty(indexed=False)
+    sik = ndb.StringProperty(indexed=False)
+
+    @property
+    def consumer_key(self):
+        return self.key.id().decode('utf8')
+
+    @classmethod
+    def create_key(cls, consumer_key):
+        return ndb.Key(cls, consumer_key, namespace=cls.NAMESPACE)
+
+
 class RogerthatUser(NdbModel):
+    NAMESPACE = NAMESPACE
+
     email = ndb.StringProperty(indexed=False)
     name = ndb.StringProperty(indexed=False)
     avatar_url = ndb.StringProperty(indexed=False)
@@ -80,10 +102,12 @@ class RogerthatUser(NdbModel):
 
     @classmethod
     def create_key(cls, user_id):
-        return ndb.Key(cls, user_id, namespace=NAMESPACE)
+        return ndb.Key(cls, user_id, namespace=cls.NAMESPACE)
 
 
 class Incident(NdbModel):
+    NAMESPACE = NAMESPACE
+
     sik = ndb.StringProperty(indexed=True)
     user_id = ndb.StringProperty(indexed=True)
     report_time = ndb.DateTimeProperty(indexed=True)
@@ -93,7 +117,12 @@ class Incident(NdbModel):
     cleanup_time = ndb.DateTimeProperty(indexed=True)
     search_keys = ndb.StringProperty(indexed=False, repeated=True)
 
-    data = ndb.JsonProperty(indexed=False)
+    integration = ndb.StringProperty(indexed=False)
+    params = ndb.JsonProperty(indexed=False)
+
+    title = ndb.StringProperty(indexed=True)
+    description = ndb.TextProperty(indexed=False)
+    geo_location = ndb.GeoPtProperty(indexed=False)
 
 # topdesk
 # incident_number = ndb.StringProperty(indexed=True)
@@ -102,14 +131,59 @@ class Incident(NdbModel):
 
     @property
     def incident_id(self):
-        return self.key().id().decode('utf8')
+        return self.key.id().decode('utf8')
 
     @classmethod
     def create_key(cls, incident_id=None):
         if incident_id is None:
             incident_id = cls.allocate_ids(1)[0]
-        return ndb.Key(cls, incident_id, namespace=NAMESPACE)
+        return ndb.Key(cls, incident_id, namespace=cls.NAMESPACE)
+
+
+class IncidentVote(NdbModel):
+    NAMESPACE = NAMESPACE
+
+    NEGATIVE = u'negative'
+    POSITIVE = u'positive'
+
+    negative_count = ndb.IntegerProperty(indexed=False)
+    positive_count = ndb.IntegerProperty(indexed=False)
+
+    @property
+    def incident_id(self):
+        return self.key.id().decode('utf8')
+
+    @classmethod
+    def create_key(cls, incident_id):
+        return ndb.Key(cls, incident_id, namespace=cls.NAMESPACE)
+
+
+class UserIncidentVote(NdbModel):
+    NAMESPACE = NAMESPACE
+
+    incident_id = ndb.StringProperty(indexed=True)
+    option_id = ndb.StringProperty(indexed=True)
+
+    @classmethod
+    def create_parent_key(cls, user_id):
+        return ndb.Key(cls, user_id, namespace=cls.NAMESPACE)
+
+    @classmethod
+    def create_key(cls, user_id, incident_id):
+        return ndb.Key(cls, incident_id, parent=cls.create_parent_key(user_id))
 
 # todo migration
 # we need to map every old incident to a new incident so that status updates keep working
 # we can't use the same id's because topdesk and 3p will have some mutual incident id's
+
+# todo specs
+# when will an item be removed
+# create dashboard for the city where they can hide/show/update status/merge incidents
+
+# todo topdesk client & i18n
+
+# todo map filters/statuses ??
+# new, planned, in progress, extra info required, waiting for supplier, on hold, closed, completed
+
+# todo are votes updateable??
+# todo has every report a vote button ? and will it always be pos/neg?

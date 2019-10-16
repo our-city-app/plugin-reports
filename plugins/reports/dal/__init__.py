@@ -15,7 +15,34 @@
 #
 # @@license_version:1.5@@
 
-from plugins.reports.models import RogerthatUser, Incident
+from mcfw.rpc import returns, arguments
+from plugins.reports.models import RogerthatUser, Incident, IntegrationSettings, \
+    Consumer
+
+
+@returns()
+@arguments(sik=unicode, integration=unicode, params=dict)
+def save_integration_settings(sik, integration, params):
+    k = IntegrationSettings.create_key(sik)
+    settings = k.get()
+    if not settings:
+        settings = IntegrationSettings(key=k)
+
+    settings.integration = integration
+    settings.params = params
+    settings.put()
+
+
+@returns(IntegrationSettings)
+@arguments(sik=unicode)
+def get_integration_settings(sik):
+    return IntegrationSettings.create_key(sik).get()
+
+
+@returns(Consumer)
+@arguments(consumer_key=unicode)
+def get_consumer(consumer_key):
+    return Consumer.create_key(consumer_key).get()
 
 
 def save_rogerthat_user(user_details):
@@ -36,15 +63,6 @@ def save_rogerthat_user(user_details):
 
 def get_rogerthat_user(user_id):
     return RogerthatUser.create_key(user_id).get()
-
-
-def create_incident(incident_id, sik, user_id, report_time):
-    incident = Incident(key=Incident.create_key(incident_id))
-    incident.sik = sik
-    incident.user_id = user_id
-    incident.report_time = report_time
-    # todo implement
-    incident.put()
 
 
 def get_incident(incident_id):
