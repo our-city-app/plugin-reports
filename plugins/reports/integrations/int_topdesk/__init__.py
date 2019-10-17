@@ -22,7 +22,7 @@ import logging
 import urllib
 
 from google.appengine.api import urlfetch
-from google.appengine.ext import deferred
+from google.appengine.ext import deferred, ndb
 from urllib3 import encode_multipart_formdata
 
 from framework.plugin_loader import get_config
@@ -36,6 +36,7 @@ from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, PropertyN
     FieldMappingType
 from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, \
     topdesk_api_call
+from plugins.reports.models import IncidentDetails, Incident
 from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, \
@@ -83,7 +84,7 @@ def create_incident(settings, rt_user, incident, steps):
         PropertyName.BRANCH: {
             'id': settings.branch_id
         },
-        'briefDescription': brief_description[:80],
+        'briefDescription': brief_description[:75],
     }
     if settings.unregistered_users:
         data['caller'] = {
@@ -96,7 +97,9 @@ def create_incident(settings, rt_user, incident, steps):
         data['callerLookup'] = {
             'id': rt_user.topdesk_id
         }
-    custom_values, included_step_ids = get_field_mapping_values(settings, steps)
+    details = IncidentDetails(status=Incident.STATUS_TODO,
+                              title=u'todo')
+    custom_values, included_step_ids = get_field_mapping_values(settings, steps, details)
     logging.info('Updating request data with %s', custom_values)
     data.update(custom_values)
     result_text = []
@@ -115,6 +118,7 @@ def create_incident(settings, rt_user, incident, steps):
         if isinstance(step, FormFlowStepTO):
             if step.answer_id == FormTO.POSITIVE:
                 if isinstance(step.get_value(), LocationWidgetResultTO):
+                    details.geo_location = ndb.GeoPt(step.get_value().latitude, step.get_value().longitude)
                     address = reverse_geocode_location(step.get_value())
                     if address:
                         step_value = '%s\n%s' % (step.display_value, address)
@@ -158,13 +162,16 @@ def create_incident(settings, rt_user, incident, steps):
         count += 1
         deferred.defer(upload_attachment, settings.sik, response['id'], url, 'foto-%s.jpg' % count)
 
-    title = description = lat = lon = None
-    return {'id': response['id'],
-            'number': response['number'],
-            'status': response['status']}, title, description, lat, lon
+    visible = details.title and details.description and details.geo_location
+    params = {
+        'id': response['id'],
+        'number': response['number'],
+        'status': response['status']
+    }
+    return visible, params, details
 
 
-def get_field_mapping_values(settings, steps):
+def get_field_mapping_values(settings, steps, details):
     # Maps form step values to fields for a topdesk incident
     custom_values = defaultdict(dict)
     included_step_ids = set()
@@ -189,6 +196,7 @@ def get_field_mapping_values(settings, steps):
                     if mapping.property == PropertyName.BRIEF_DESCRIPTION:
                         if result:
                             custom_values[mapping.property] = result[:80] or mapping.default_value
+                            details.description = custom_values[mapping.property]
                     else:
                         custom_values[mapping.property]['id'] = result or mapping.default_value
                         included_step_ids.add(step.step_id)

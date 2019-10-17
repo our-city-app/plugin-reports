@@ -58,6 +58,9 @@ def create_index():
             "properties": {
                 "location": {
                     "type": "geo_point"
+                },
+                "status": {
+                    "type":  "keyword"
                 }
             }
         }
@@ -168,6 +171,11 @@ def _search(lat, lon, distance, status, cursor, limit, is_new=False):
                                 "lon" : lon
                             }
                         }
+                    },
+                    {
+                        "term": {
+                            "status": status
+                        }
                     }
                 ]
             }
@@ -183,8 +191,6 @@ def _search(lat, lon, distance, status, cursor, limit, is_new=False):
             }
         ]
     }
-
-    # todo fix status in search
 
     base_url, es_user, es_passwd = get_elasticsearch_config()
 

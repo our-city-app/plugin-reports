@@ -19,7 +19,7 @@ from datetime import datetime
 import logging
 
 from google.appengine.api import app_identity
-from google.appengine.ext import deferred
+from google.appengine.ext import deferred, ndb
 
 import dicttoxml
 from framework.utils import guid
@@ -28,6 +28,7 @@ from plugins.reports.bizz.gcs import is_file_available, upload_to_gcs
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import INCIDENTS_QUEUE
 from plugins.reports.dal import get_incident, get_rogerthat_user
+from plugins.reports.models import IncidentDetails, Incident
 from plugins.rogerthat_api.to import MemberTO
 
 
@@ -37,7 +38,14 @@ def create_incident(settings, rt_user, incident, steps):
         logging.warn(xml_content)
     deferred.defer(create_incident_on_gcs, settings.params['bucket_name'], incident.incident_id, xml_content, _queue=INCIDENTS_QUEUE)
 
-    return {}, title, description, lat, lon
+    if title and description and lat and lon:
+        details = IncidentDetails(status=Incident.STATUS_TODO,
+                                  title=title,
+                                  description=description,
+                                  geo_location=ndb.GeoPt(lat, lon))
+
+        return True, {}, details
+    return False, {}, None
 
 
 def create_incident_xml(incident, rt_user, steps):

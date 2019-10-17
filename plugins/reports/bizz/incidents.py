@@ -24,7 +24,7 @@ from framework.bizz.job import run_job
 from framework.utils import guid
 from mcfw.properties import object_factory
 from mcfw.rpc import returns, arguments, parse_complex_value
-from plugins.reports.bizz.elasticsearch import delete_docs
+from plugins.reports.bizz.elasticsearch import delete_docs, index_docs
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, \
     get_integration_settings, get_incident
@@ -62,12 +62,25 @@ def re_index(m_key):
 @arguments(incident=Incident)
 def re_index_incident(incident):
     delete_docs(incident.search_keys)
-
-    incident.visible = False
-    incident.cleanup_date = None
     incident.search_keys = []
+    if not incident.visible:
+        incident.cleanup_date = None
+        incident.put()
+        return
 
-    # todo implement
+    docs = []
+    doc = {
+        "location": {
+            "lat": incident.details.geo_location.lat,
+            "lon": incident.details.geo_location.lon
+        },
+        "status": incident.details.status
+    }
+    docs.append({'uid': incident.incident_id, 'data': doc})
+    incident.search_keys.append(incident.incident_id)
+
+    incident.put()
+    index_docs(docs)
 
 
 def process_incident(sik, user_details, parent_message_key, steps, timestamp):
@@ -94,14 +107,11 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
         logging.error('Could not find integration settings for %s' % (sik))
         return
 
-    # todo implement
-
     incident = Incident(key=Incident.create_key(incident_id))
     incident.sik = sik
     incident.user_id = user_id
     incident.report_time = datetime.utcfromtimestamp(timestamp)
     incident.resolve_time = None
-    incident.visible = False
     incident.cleanup_time = None
     incident.search_keys = []
     incident.integration = settings.integration
@@ -111,21 +121,19 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
 
     parsed_steps = parse_complex_value(object_factory("step_type", FLOW_STEP_MAPPING), steps, True)
     if settings.integration == IntegrationSettings.INT_TOPDESK:
-        params, title, description, lat, lon = create_topdesk_incident(settings, rt_user, incident, parsed_steps)
+        visible, params, details = create_topdesk_incident(settings, rt_user, incident, parsed_steps)
     elif settings.integration == IntegrationSettings.INT_3P:
-        params, title, description, lat, lon = create_3p_incident(settings, rt_user, incident, parsed_steps)
+        visible, params, details = create_3p_incident(settings, rt_user, incident, parsed_steps)
     else:
+        visible = False
         params = None
-        title = description = lat = lon = None
+        details = None
     if params:
         incident.params.update(params)
-    incident.title = title
-    incident.description = description
-    if lat and lon:
-        incident.geo_location = ndb.GeoPt(lat, lon)
-    else:
-        incident.geo_location = None
-    incident.put()
+    incident.visible = visible
+    incident.details = details
+
+    re_index_incident(incident)
 
 
 def incident_follow_up(from_, regex, subject, body):

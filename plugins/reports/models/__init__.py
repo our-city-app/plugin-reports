@@ -105,8 +105,17 @@ class RogerthatUser(NdbModel):
         return ndb.Key(cls, user_id, namespace=cls.NAMESPACE)
 
 
+class IncidentDetails(NdbModel):
+    status = ndb.StringProperty(indexed=False)
+    title = ndb.StringProperty(indexed=False)
+    description = ndb.TextProperty(indexed=False)
+    geo_location = ndb.GeoPtProperty(indexed=False)
+
+
 class Incident(NdbModel):
     NAMESPACE = NAMESPACE
+
+    STATUS_TODO = u'todo'
 
     sik = ndb.StringProperty(indexed=True)
     user_id = ndb.StringProperty(indexed=True)
@@ -120,9 +129,7 @@ class Incident(NdbModel):
     integration = ndb.StringProperty(indexed=False)
     params = ndb.JsonProperty(indexed=False)
 
-    title = ndb.StringProperty(indexed=True)
-    description = ndb.TextProperty(indexed=False)
-    geo_location = ndb.GeoPtProperty(indexed=False)
+    details = ndb.LocalStructuredProperty(IncidentDetails)
 
 # topdesk
 # incident_number = ndb.StringProperty(indexed=True)

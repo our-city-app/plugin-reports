@@ -58,7 +58,8 @@ def _get_items(self):
     lat = params.get('lat')
     lng = params.get('lon')
     distance = params.get('distance')
-    status = params.get('status')
+#     status = params.get('status')
+    status = Incident.STATUS_TODO  # todo fix status
     limit = params.get('limit')
     cursor = params.get('cursor', None)
 
