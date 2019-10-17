@@ -27,7 +27,6 @@ from mcfw.rpc import serialize_complex_value
 from plugins.reports.bizz import convert_to_item_details_tos, \
     update_incident_vote, get_vote_options
 from plugins.reports.bizz.elasticsearch import search_current
-from plugins.reports.integrations.int_topdesk.importer import FakeTopdeskIncident
 from plugins.reports.models import Consumer, Incident, IncidentVote, \
     UserIncidentVote
 from plugins.reports.to import GetMapItemDetailsResponseTO, \
@@ -109,7 +108,7 @@ def _get_details(self):
 
     keys = set()
     for uid in ids:
-        keys.add(FakeTopdeskIncident.create_key(uid))
+        keys.add(Incident.create_key(uid))
 
     items = []
     if keys:
@@ -164,7 +163,7 @@ class ReportItemsVoteHandler(AuthValidationHandler):
             self.abort(400)
             return
 
-        incident = FakeTopdeskIncident.create_key(item_id).get()
+        incident = Incident.create_key(item_id).get()
         if not incident:
             self.abort(400)
             return

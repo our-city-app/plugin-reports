@@ -114,7 +114,6 @@ def index_doc(uid, data):
 
 def search_current(lat, lon, distance, status, cursor=None, limit=10):
     from plugins.reports.bizz import convert_to_item_tos
-    from plugins.reports.integrations.int_topdesk.importer import FakeTopdeskIncident
     start_time = time.time()
     new_cursor, result_data = _search(lat, lon, distance, status, cursor, limit, is_new=False)
     took_time = time.time() - start_time
@@ -124,7 +123,7 @@ def search_current(lat, lon, distance, status, cursor=None, limit=10):
     start_time = time.time()
     for hit in result_data['hits']['hits']:
         uid = hit['_id']
-        keys.add(FakeTopdeskIncident.create_key(uid))
+        keys.add(Incident.create_key(uid))
 
     took_time = time.time() - start_time
     logging.info('debugging.search_current hits {0:.3f}s'.format(took_time))
