@@ -139,7 +139,7 @@ def create_incident_xml(incident, rt_user, steps):
     }
     xml = dicttoxml.dicttoxml(work_order, custom_root='Workorder', attr_type=False)
     prettyxml = dicttoxml.parseString(xml).toprettyxml(encoding='utf8')
-    details = IncidentDetails()
+    details = IncidentDetails(status=Incident.STATUS_TODO)
     details.title = incident_type
     details.description = '\n'.join(description) if description else None
     if latitude and longitude:

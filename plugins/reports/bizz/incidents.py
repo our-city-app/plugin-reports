@@ -15,8 +15,8 @@
 #
 # @@license_version:1.5@@
 
-import logging
 from datetime import datetime
+import logging
 from uuid import uuid4
 
 from google.appengine.ext import ndb, deferred
@@ -76,10 +76,11 @@ def re_index_incident(incident):
 
 def process_incident(sik, user_details, parent_message_key, steps, timestamp):
     rt_user = save_rogerthat_user(user_details[0])
-    try_or_defer(_create_incident, sik, rt_user.user_id, parent_message_key, timestamp, steps)
+    incident_id = str(uuid4())
+    try_or_defer(_create_incident, incident_id, sik, rt_user.user_id, parent_message_key, timestamp, steps)
 
 
-def _create_incident(sik, user_id, parent_message_key, timestamp, steps):
+def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, steps):
     logging.debug("_create_incident for user %s", user_id)
     rt_user = get_rogerthat_user(user_id)
     if not rt_user:
@@ -91,7 +92,6 @@ def _create_incident(sik, user_id, parent_message_key, timestamp, steps):
         logging.error('Could not find integration settings for %s' % (sik))
         return
 
-    incident_id = str(uuid4())
     incident = Incident(key=Incident.create_key(incident_id))
     incident.sik = sik
     incident.user_id = user_id
