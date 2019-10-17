@@ -15,40 +15,35 @@
 #
 # @@license_version:1.5@@
 
-import base64
-from collections import defaultdict
 import json
 import logging
 import urllib
+from collections import defaultdict
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import deferred, ndb
-from urllib3 import encode_multipart_formdata
 
 from framework.plugin_loader import get_config
 from framework.utils import try_or_defer, guid
-from mcfw.exceptions import HttpBadRequestException
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import NAMESPACE
-from plugins.reports.dal import get_integration_settings, get_incident, \
-    get_rogerthat_user
-from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, PropertyName, \
-    FieldMappingType
-from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, \
-    topdesk_api_call
-from plugins.reports.models import IncidentDetails, Incident
+from plugins.reports.dal import get_integration_settings, get_incident, get_rogerthat_user
+from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName, TopdeskFieldMappingType
+from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, topdesk_api_call
+from plugins.reports.models import IncidentDetails, Incident, RogerthatUser, TopdeskSettings, IntegrationSettings
 from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
-from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, \
-    MessageFlowStepTO, BaseFlowStepTO
-from plugins.rogerthat_api.to.messaging.forms import Widget, FormTO, \
-    OpenIdWidgetResultTO, LocationWidgetResultTO
+from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO
+from plugins.rogerthat_api.to.messaging.forms import Widget, FormTO, OpenIdWidgetResultTO, LocationWidgetResultTO
 
 SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, Widget.TYPE_DATE_SELECT,
                           Widget.TYPE_RANGE_SLIDER)
 
 
-def create_incident(settings, rt_user, incident, steps):
+def create_incident(config, rt_user, incident, steps):
+    # type: (IntegrationSettings, RogerthatUser, Incident, list[BaseFlowStepTO]) -> [bool, dict, IncidentDetails]
+    settings = config.data  # type: TopdeskSettings
+    # todo remove ?
     name_step = get_step(steps, 'message_name')
     if name_step:
         pass  # details.name = name_step.get_value().strip() # todo fix
@@ -57,31 +52,33 @@ def create_incident(settings, rt_user, incident, steps):
     # todo fix openid_result
     attachments = []
 
-    brief_description = 'Nieuwe melding door %s' % rt_user.name
+    brief_description = 'Nieuwe melding'
+
+    incident_details = IncidentDetails(status=Incident.STATUS_TODO)
 
     data = {
-        PropertyName.CALL_TYPE: {
+        TopdeskPropertyName.CALL_TYPE: {
             'id': settings.call_type_id
         },
-        PropertyName.ENTRY_TYPE: {
+        TopdeskPropertyName.ENTRY_TYPE: {
             'id': settings.entry_type_id
         },
-        PropertyName.CATEGORY: {
+        TopdeskPropertyName.CATEGORY: {
             'id': settings.category_id
         },
-        PropertyName.SUB_CATEGORY: {
+        TopdeskPropertyName.SUB_CATEGORY: {
             'id': settings.sub_category_id
         },
-        PropertyName.LOCATION: {
+        TopdeskPropertyName.LOCATION: {
             'id': None
         },
-        PropertyName.OPERATOR: {
+        TopdeskPropertyName.OPERATOR: {
             'id': settings.operator_id
         },
-        PropertyName.OPERATOR_GROUP: {
+        TopdeskPropertyName.OPERATOR_GROUP: {
             'id': settings.operator_group_id
         },
-        PropertyName.BRANCH: {
+        TopdeskPropertyName.BRANCH: {
             'id': settings.branch_id
         },
         'briefDescription': brief_description[:75],
@@ -95,16 +92,14 @@ def create_incident(settings, rt_user, incident, steps):
             data['caller']['branch'] = {'id': settings.caller_branch_id}
     else:
         data['callerLookup'] = {
-            'id': rt_user.topdesk_id
+            'id': rt_user.external_id
         }
-    details = IncidentDetails(status=Incident.STATUS_TODO,
-                              title=u'todo')
-    custom_values, included_step_ids = get_field_mapping_values(settings, steps, details)
+    custom_values, included_step_ids = get_field_mapping_values(settings, steps)
     logging.info('Updating request data with %s', custom_values)
     data.update(custom_values)
     result_text = []
     request_step_ids = {mapping.step_id for mapping in settings.field_mapping
-                        if mapping.property == PropertyName.REQUEST and mapping.step_id not in included_step_ids}
+                        if mapping.property == TopdeskPropertyName.REQUEST and mapping.step_id not in included_step_ids}
     # Populate the 'request' field and upload attachments
     for step in steps:
         if isinstance(step, FormFlowStepTO) and step.answer_id == FormTO.POSITIVE:
@@ -118,7 +113,7 @@ def create_incident(settings, rt_user, incident, steps):
         if isinstance(step, FormFlowStepTO):
             if step.answer_id == FormTO.POSITIVE:
                 if isinstance(step.get_value(), LocationWidgetResultTO):
-                    details.geo_location = ndb.GeoPt(step.get_value().latitude, step.get_value().longitude)
+                    incident_details.geo_location = ndb.GeoPt(step.get_value().latitude, step.get_value().longitude)
                     address = reverse_geocode_location(step.get_value())
                     if address:
                         step_value = '%s\n%s' % (step.display_value, address)
@@ -153,6 +148,12 @@ def create_incident(settings, rt_user, incident, steps):
         if isinstance(value, dict):
             if 'id' in value and not value['id']:
                 del data[key]
+
+    # TODO: add one or more of category/subcategory/calltype to title or description
+    incident_details.title = data['briefDescription']
+    # TODO: should be markdown
+    incident_details.description = result_text
+
     logging.debug('Creating incident: %s', data)
     response = topdesk_api_call(settings, '/api/incidents', urlfetch.POST, data)
     logging.debug('Result from server: %s', response)
@@ -160,26 +161,28 @@ def create_incident(settings, rt_user, incident, steps):
     count = 0
     for url in attachments:
         count += 1
-        deferred.defer(upload_attachment, settings.sik, response['id'], url, 'foto-%s.jpg' % count)
+        deferred.defer(upload_attachment, config.sik, response['id'], url, 'foto-%s.jpg' % count)
 
-    visible = details.title and details.description and details.geo_location
-    params = {
-        'id': response['id'],
+    # TODO shouldn't be visible if user didn't consent for this
+    visible = all((incident_details.title, incident_details.description, incident_details.geo_location))
+    incident.visible = visible
+    incident.details = incident_details
+    incident.params.update({
         'number': response['number'],
-        'status': response['status']
-    }
-    return visible, params, details
+        'status': response['status'],
+    })
+    incident.external_id = response['id']
 
 
-def get_field_mapping_values(settings, steps, details):
+def get_field_mapping_values(settings, steps):
     # Maps form step values to fields for a topdesk incident
     custom_values = defaultdict(dict)
     included_step_ids = set()
     for mapping in settings.field_mapping:
-        if mapping.type == FieldMappingType.FIXED_VALUE:
+        if mapping.type == TopdeskFieldMappingType.FIXED_VALUE:
             custom_values[mapping.property][mapping.value_properties[0]] = mapping.default_value
             continue
-        if mapping.property == PropertyName.REQUEST:
+        if mapping.property == TopdeskPropertyName.REQUEST:
             # request field is a special snowflake that gets populated later
             continue
         step = get_step(steps, mapping.step_id)
@@ -187,30 +190,29 @@ def get_field_mapping_values(settings, steps, details):
             if step.answer_id != FormTO.POSITIVE:
                 continue
             result = step.get_value()
-            if mapping.type == FieldMappingType.TEXT:
+            if mapping.type == TopdeskFieldMappingType.TEXT:
                 result = result and result.strip() or ''
-                if mapping.property in (PropertyName.OPTIONAL_FIELDS_1, PropertyName.OPTIONAL_FIELDS_2):
+                if mapping.property in (TopdeskPropertyName.OPTIONAL_FIELDS_1, TopdeskPropertyName.OPTIONAL_FIELDS_2):
                     custom_values[mapping.property][mapping.value_properties[0]] = result or mapping.default_value
                     included_step_ids.add(step.step_id)
                 else:
-                    if mapping.property == PropertyName.BRIEF_DESCRIPTION:
+                    if mapping.property == TopdeskPropertyName.BRIEF_DESCRIPTION:
                         if result:
                             custom_values[mapping.property] = result[:80] or mapping.default_value
-                            details.description = custom_values[mapping.property]
                     else:
                         custom_values[mapping.property]['id'] = result or mapping.default_value
                         included_step_ids.add(step.step_id)
-            elif mapping.type == FieldMappingType.GPS_SINGLE_FIELD:
+            elif mapping.type == TopdeskFieldMappingType.GPS_SINGLE_FIELD:
                 assert isinstance(result, LocationWidgetResultTO)
                 custom_values[mapping.property][mapping.value_properties[0]] = '%s,%s' % (result.latitude,
                                                                                           result.longitude)
                 included_step_ids.add(step.step_id)
-            elif mapping.type == FieldMappingType.GPS_URL:
+            elif mapping.type == TopdeskFieldMappingType.GPS_URL:
                 assert isinstance(result, LocationWidgetResultTO)
                 custom_values[mapping.property][mapping.value_properties[0]] = \
                     'https://www.google.com/maps/search/?api=1&query=%s,%s' % (result.latitude, result.longitude)
                 included_step_ids.add(step.step_id)
-            elif mapping.type == FieldMappingType.REVERSE_MAPPING:
+            elif mapping.type == TopdeskFieldMappingType.REVERSE_MAPPING:
                 assert isinstance(result, unicode)
                 value_id = get_reverse_value(settings, mapping.property, result, custom_values)
                 if value_id:
@@ -248,8 +250,8 @@ def find_step_by_type(steps, type):
 def _get_topdesk_values(settings, property_name, custom_values):
     resource = ENDPOINTS[property_name]
     query = '?'
-    if property_name == PropertyName.LOCATION:
-        branch_id = custom_values.get(PropertyName.BRANCH, {}).get('id') or settings.branch_id  # todo fix
+    if property_name == TopdeskPropertyName.LOCATION:
+        branch_id = custom_values.get(TopdeskPropertyName.BRANCH, {}).get('id') or settings.branch_id  # todo fix
         if not branch_id:
             return []
         query += '&branch=%s' % branch_id

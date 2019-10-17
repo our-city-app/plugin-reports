@@ -17,8 +17,12 @@
 
 from google.appengine.ext import ndb
 
-from framework.models.common import NdbModel
+from framework.models.common import NdbModel, TOProperty
+from framework.to import TO
+from mcfw.properties import unicode_property, object_factory, unicode_list_property, long_property, bool_property, \
+    typed_property
 from plugins.reports.consts import NAMESPACE
+from plugins.rogerthat_api.plugin_utils import Enum
 
 
 class ElasticsearchSettings(NdbModel):
@@ -34,30 +38,64 @@ class ElasticsearchSettings(NdbModel):
         return ndb.Key(cls, u'ElasticsearchSettings', namespace=cls.NAMESPACE)
 
 
+class TopdeskfieldMapping(TO):
+    # id of form step
+    step_id = unicode_property('step_id')
+    # property name on topdesk, See TopdeskPropertyName
+    property = unicode_property('property')
+    # in case of optional fields, there need to be one or more value fields. SEE TEXT_OPTIONS
+    value_properties = unicode_list_property('value_properties')
+    # See TopdeskFieldMappingType
+    type = long_property('type')
+    # In case type == TopdeskFieldMappingType.FIXED_VALUE, 'step_id' is ignored and this is always used
+    default_value = unicode_property('default_value')
+
+
+class TopdeskSettings(TO):
+    api_url = unicode_property('api_url')
+    username = unicode_property('username')
+    password = unicode_property('password')
+    api_user = unicode_property('api_user')
+    call_type_id = unicode_property('call_type_id')
+    category_id = unicode_property('category_id')
+    sub_category_id = unicode_property('sub_category_id')
+    entry_type_id = unicode_property('entry_type_id')
+    operator_id = unicode_property('operator_id')
+    operator_group_id = unicode_property('operator_group_id')
+    caller_branch_id = unicode_property('caller_branch_id')
+    branch_id = unicode_property('branch_id')
+    unregistered_users = bool_property('unregistered_users')
+    field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)
+
+
+class ThreePSettings(TO):
+    gcs_bucket_name = unicode_property('gcs_bucket_name')
+
+
+class IntegrationProvider(Enum):
+    TOPDESK = u'topdesk'
+    THREE_P = u'3p'
+
+
+INTEGRATION_SETTINGS_MAPPING = {
+    IntegrationProvider.TOPDESK: TopdeskSettings,
+    IntegrationProvider.THREE_P: ThreePSettings,
+}
+
+
+class IntegrationSettingsData(object_factory):
+    provider = unicode_property('provider')
+
+    def __init__(self):
+        super(IntegrationSettingsData, self).__init__('provider', INTEGRATION_SETTINGS_MAPPING)
+
+
 class IntegrationSettings(NdbModel):
     NAMESPACE = NAMESPACE
 
-    INT_NONE = u'none'
-    INT_TOPDESK = u'topdesk'
-    INT_3P = u'3p'
-
     integration = ndb.StringProperty(indexed=False)
-    params = ndb.JsonProperty(indexed=False)
-
-# mutual
-#     rogerthat_branding_key = ndb.StringProperty(indexed=False)
-
-# topdesk
-#     topdesk_api_url = ndb.StringProperty(indexed=False)
-#     topdesk_username = ndb.StringProperty(indexed=False)
-#     topdesk_password = ndb.StringProperty(indexed=False)
-#     topdesk_api_user = ndb.StringProperty(indexed=False)
-#     topdesk_call_type = ndb.StringProperty(indexed=False)
-#     topdesk_category = ndb.StringProperty(indexed=False)
-#     topdesk_sub_category = ndb.StringProperty(indexed=False)
-
-# 3p
-#     gcs_bucket_name = ndb.StringProperty(indexed=False)
+    params = ndb.JsonProperty()  # todo: remove
+    data = TOProperty(IntegrationSettingsData)
 
     @property
     def sik(self):
@@ -91,6 +129,7 @@ class RogerthatUser(NdbModel):
     avatar_url = ndb.StringProperty(indexed=False)
     language = ndb.StringProperty(indexed=False)
     app_id = ndb.StringProperty(indexed=False)
+    external_id = ndb.StringProperty()
 
     @property
     def user_id(self):
@@ -122,12 +161,11 @@ class Incident(NdbModel):
     report_time = ndb.DateTimeProperty(indexed=True)
     resolve_time = ndb.DateTimeProperty(indexed=True)
 
-    visible = ndb.BooleanProperty(indexed=True)
+    visible = ndb.BooleanProperty(indexed=True, default=False)
     cleanup_time = ndb.DateTimeProperty(indexed=True)
-    search_keys = ndb.StringProperty(indexed=False, repeated=True)
 
     integration = ndb.StringProperty(indexed=False)
-    params = ndb.JsonProperty(indexed=False)
+    params = ndb.JsonProperty()
 
     details = ndb.LocalStructuredProperty(IncidentDetails)
 
@@ -138,12 +176,10 @@ class Incident(NdbModel):
 
     @property
     def incident_id(self):
-        return self.key.id().decode('utf8')
+        return self.key.id()
 
     @classmethod
-    def create_key(cls, incident_id=None):
-        if incident_id is None:
-            incident_id = cls.allocate_ids(1)[0]
+    def create_key(cls, incident_id):
         return ndb.Key(cls, incident_id, namespace=cls.NAMESPACE)
 
 

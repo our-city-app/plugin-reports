@@ -15,7 +15,6 @@
 #
 # @@license_version:1.5@@
 
-from datetime import datetime
 import logging
 
 from google.appengine.api import app_identity
@@ -28,27 +27,28 @@ from plugins.reports.bizz.gcs import is_file_available, upload_to_gcs
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import INCIDENTS_QUEUE
 from plugins.reports.dal import get_incident, get_rogerthat_user
-from plugins.reports.models import IncidentDetails, Incident
+from plugins.reports.models import RogerthatUser, Incident, IncidentDetails, ThreePSettings, IntegrationSettings
 from plugins.rogerthat_api.to import MemberTO
 
 
 def create_incident(settings, rt_user, incident, steps):
-    xml_content, title, description, lat = lon = create_incident_xml(incident, rt_user, steps)
+    # type: (IntegrationSettings, RogerthatUser, Incident, list) -> [bool, dict, None]
+    xml_content, details = create_incident_xml(incident, rt_user, steps)
     if DEBUG:
-        logging.warn(xml_content)
-    deferred.defer(create_incident_on_gcs, settings.params['bucket_name'], incident.incident_id, xml_content, _queue=INCIDENTS_QUEUE)
+        logging.debug(xml_content)
+    data = settings.data  # type: ThreePSettings
+    deferred.defer(create_incident_on_gcs, data.gcs_bucket_name, incident.incident_id, xml_content,
+                   _queue=INCIDENTS_QUEUE)
 
-    if title and description and lat and lon:
-        details = IncidentDetails(status=Incident.STATUS_TODO,
-                                  title=title,
-                                  description=description,
-                                  geo_location=ndb.GeoPt(lat, lon))
-
-        return True, {}, details
-    return False, {}, None
+    incident.details = details
+    if details.title and details.description and details.geo_location:
+        incident.visible = True
+    else:
+        incident.visible = False
 
 
 def create_incident_xml(incident, rt_user, steps):
+    # type: (Incident, RogerthatUser, list) -> [str, IncidentDetails]
     attachments = []
     result_text = []
     incident_type = None
@@ -117,10 +117,12 @@ def create_incident_xml(incident, rt_user, steps):
             result_text.append(step.message)
             result_text.append(step_value)
 
-    result_text.append(u'\nJe kan deze melding beantwoorden door een e-mail te sturen naar:\nincident.%s.followup@%s.appspotmail.com' % (incident.incident_id, app_identity.get_application_id()))
+    result_text.append(u'\nJe kan deze melding beantwoorden door een e-mail te sturen naar:'
+                       u'\nincident.%s.followup@%s.appspotmail.com' % (incident.incident_id,
+                                                                       app_identity.get_application_id()))
 
     comment = '\r\n'.join(result_text)
-    workOrder = {
+    work_order = {
         u'dateasked': incident.report_time.isoformat(),
         u'description': '\n'.join(description) if description else u'Nieuwe melding',
         u'comment': comment,
@@ -135,11 +137,15 @@ def create_incident_xml(incident, rt_user, steps):
         u'attachments': attachments
 
     }
-    xml = dicttoxml.dicttoxml(workOrder, custom_root='Workorder', attr_type=False)
+    xml = dicttoxml.dicttoxml(work_order, custom_root='Workorder', attr_type=False)
     prettyxml = dicttoxml.parseString(xml).toprettyxml(encoding='utf8')
-    # 3p can't process xml with encoding...
-    return prettyxml.replace('<?xml version="1.0" encoding="utf8"?>', '<?xml version="1.0"?>'), \
-        incident_type, '\n'.join(description) if description else None, latitude, longitude
+    details = IncidentDetails()
+    details.title = incident_type
+    details.description = '\n'.join(description) if description else None
+    if latitude and longitude:
+        details.geo_location = ndb.GeoPt(latitude, longitude)
+    # Remove encoding since 3p can't process it
+    return prettyxml.replace('<?xml version="1.0" encoding="utf8"?>', '<?xml version="1.0"?>'), details
 
 
 def create_incident_on_gcs(gcs_bucket_name, incident_id, xml_content, attempt=1):

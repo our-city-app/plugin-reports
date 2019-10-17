@@ -18,7 +18,7 @@
 from plugins.rogerthat_api.plugin_utils import Enum
 
 
-class FieldMappingType(Enum):
+class TopdeskFieldMappingType(Enum):
     TEXT = 1
     GPS_SINGLE_FIELD = 2
     GPS_URL = 3
@@ -26,7 +26,7 @@ class FieldMappingType(Enum):
     REVERSE_MAPPING = 5
 
 
-class PropertyName(Enum):
+class TopdeskPropertyName(Enum):
     BRIEF_DESCRIPTION = 'briefDescription'
     REQUEST = 'request'
     CALL_TYPE = 'callType'
@@ -42,14 +42,14 @@ class PropertyName(Enum):
 
 
 ENDPOINTS = {
-    PropertyName.ENTRY_TYPE: '/incidents/entry_types',
-    PropertyName.CALL_TYPE: '/incidents/call_types',
-    PropertyName.CATEGORY: '/incidents/categories',
-    PropertyName.SUB_CATEGORY: '/incidents/subcategories',
-    PropertyName.BRANCH: '/branches',
-    PropertyName.LOCATION: '/locations',
-    PropertyName.OPERATOR: '/operators',
-    PropertyName.OPERATOR_GROUP: '/operatorgroups',
+    TopdeskPropertyName.ENTRY_TYPE: '/incidents/entry_types',
+    TopdeskPropertyName.CALL_TYPE: '/incidents/call_types',
+    TopdeskPropertyName.CATEGORY: '/incidents/categories',
+    TopdeskPropertyName.SUB_CATEGORY: '/incidents/subcategories',
+    TopdeskPropertyName.BRANCH: '/branches',
+    TopdeskPropertyName.LOCATION: '/locations',
+    TopdeskPropertyName.OPERATOR: '/operators',
+    TopdeskPropertyName.OPERATOR_GROUP: '/operatorgroups',
 }
 
 TEXT_OPTIONS = ['text1', 'text2', 'text3', 'text4', 'text5']

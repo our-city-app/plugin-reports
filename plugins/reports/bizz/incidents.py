@@ -15,22 +15,23 @@
 #
 # @@license_version:1.5@@
 
-from datetime import datetime
 import logging
+from datetime import datetime
+from uuid import uuid4
 
 from google.appengine.ext import ndb, deferred
 
 from framework.bizz.job import run_job
-from framework.utils import guid
+from framework.utils import guid, try_or_defer
 from mcfw.properties import object_factory
 from mcfw.rpc import returns, arguments, parse_complex_value
-from plugins.reports.bizz.elasticsearch import delete_docs, index_docs
+from plugins.reports.bizz.elasticsearch import index_doc
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, \
     get_integration_settings, get_incident
 from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
 from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
-from plugins.reports.models import Incident, IntegrationSettings
+from plugins.reports.models import Incident, IntegrationSettings, IntegrationProvider
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_MAPPING
 
@@ -61,41 +62,24 @@ def re_index(m_key):
 @returns()
 @arguments(incident=Incident)
 def re_index_incident(incident):
-    delete_docs(incident.search_keys)
-    incident.search_keys = []
-    if not incident.visible:
-        incident.cleanup_date = None
-        incident.put()
-        return
-
-    docs = []
+    # TODO: is this necessary ?
+    # delete_doc(incident.incident_id)
     doc = {
-        "location": {
-            "lat": incident.details.geo_location.lat,
-            "lon": incident.details.geo_location.lon
+        'location': {
+            'lat': incident.details.geo_location.lat,
+            'lon': incident.details.geo_location.lon
         },
-        "status": incident.details.status
+        'status': incident.details.status
     }
-    docs.append({'uid': incident.incident_id, 'data': doc})
-    incident.search_keys.append(incident.incident_id)
-
-    incident.put()
-    index_docs(docs)
+    index_doc(incident.incident_id, doc)
 
 
 def process_incident(sik, user_details, parent_message_key, steps, timestamp):
     rt_user = save_rogerthat_user(user_details[0])
-    incident_id = Incident.create_key().id()
-    deferred.defer(_create_incident,
-                   incident_id,
-                   sik,
-                   rt_user.user_id,
-                   parent_message_key,
-                   timestamp,
-                   steps)
+    try_or_defer(_create_incident, sik, rt_user.user_id, parent_message_key, timestamp, steps)
 
 
-def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, steps):
+def _create_incident(sik, user_id, parent_message_key, timestamp, steps):
     logging.debug("_create_incident for user %s", user_id)
     rt_user = get_rogerthat_user(user_id)
     if not rt_user:
@@ -107,32 +91,26 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
         logging.error('Could not find integration settings for %s' % (sik))
         return
 
+    incident_id = str(uuid4())
     incident = Incident(key=Incident.create_key(incident_id))
     incident.sik = sik
     incident.user_id = user_id
     incident.report_time = datetime.utcfromtimestamp(timestamp)
     incident.resolve_time = None
     incident.cleanup_time = None
-    incident.search_keys = []
     incident.integration = settings.integration
     incident.params = {'source': 'app',
                        'parent_message_key': parent_message_key,
                        'steps': steps}
 
     parsed_steps = parse_complex_value(object_factory("step_type", FLOW_STEP_MAPPING), steps, True)
-    if settings.integration == IntegrationSettings.INT_TOPDESK:
-        visible, params, details = create_topdesk_incident(settings, rt_user, incident, parsed_steps)
-    elif settings.integration == IntegrationSettings.INT_3P:
-        visible, params, details = create_3p_incident(settings, rt_user, incident, parsed_steps)
+    if settings.integration == IntegrationProvider.TOPDESK:
+        create_topdesk_incident(settings, rt_user, incident, parsed_steps)
+    elif settings.integration == IntegrationProvider.THREE_P:
+        create_3p_incident(settings, rt_user, incident, parsed_steps)
     else:
-        visible = False
-        params = None
-        details = None
-    if params:
-        incident.params.update(params)
-    incident.visible = visible
-    incident.details = details
-
+        raise Exception('Unknown integration: %s' % settings.integration)
+    incident.put()
     re_index_incident(incident)
 
 

@@ -16,36 +16,38 @@
 # @@license_version:1.5@@
 
 from mcfw.rpc import returns, arguments
-from plugins.reports.models import RogerthatUser, Incident, IntegrationSettings, \
-    Consumer
+from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident
+from plugins.rogerthat_api.to import UserDetailsTO
 
 
 @returns()
-@arguments(sik=unicode, integration=unicode, params=dict)
-def save_integration_settings(sik, integration, params):
+@arguments(sik=unicode, integration=unicode, data=IntegrationSettingsData)
+def save_integration_settings(sik, integration, data):
+    # type: (str, str, IntegrationSettingsData) -> IntegrationSettings
     k = IntegrationSettings.create_key(sik)
-    settings = k.get()
-    if not settings:
-        settings = IntegrationSettings(key=k)
-
+    settings = k.get() or IntegrationSettings(key=k)
     settings.integration = integration
-    settings.params = params
+    settings.data = data
     settings.put()
+    return settings
 
 
 @returns(IntegrationSettings)
 @arguments(sik=unicode)
 def get_integration_settings(sik):
+    # type: (str) -> IntegrationSettings
     return IntegrationSettings.create_key(sik).get()
 
 
 @returns(Consumer)
 @arguments(consumer_key=unicode)
 def get_consumer(consumer_key):
+    # type: (str) -> Consumer
     return Consumer.create_key(consumer_key).get()
 
 
 def save_rogerthat_user(user_details):
+    # type: (UserDetailsTO) -> RogerthatUser
     rt_user_id = RogerthatUser.create_user_id(user_details.email, user_details.app_id)
     rt_user_key = RogerthatUser.create_key(rt_user_id)
     rt_user = rt_user_key.get()
@@ -62,8 +64,10 @@ def save_rogerthat_user(user_details):
 
 
 def get_rogerthat_user(user_id):
+    # type: (str) -> RogerthatUser
     return RogerthatUser.create_key(user_id).get()
 
 
 def get_incident(incident_id):
+    # type: (str) -> Incident
     return Incident.create_key(incident_id).get()

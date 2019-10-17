@@ -16,19 +16,19 @@
 # @@license_version:1.5@@
 
 import base64
-from cStringIO import StringIO
 import json
 import logging
+from cStringIO import StringIO
+
+from google.appengine.api import urlfetch
 
 from PIL import Image
-from google.appengine.api import urlfetch
-from urllib3 import encode_multipart_formdata
-
 from mcfw.exceptions import HttpBadRequestException
 from plugins.reports.dal import get_integration_settings
-from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, \
-    PropertyName
+from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName
+from plugins.reports.models import TopdeskSettings
 from plugins.rogerthat_api.to.messaging.forms import OpenIdWidgetResultTO
+from urllib3 import encode_multipart_formdata
 
 
 class TopdeskApiException(Exception):
@@ -44,6 +44,11 @@ class TopdeskApiException(Exception):
 
     def __str__(self):
         return self.message
+
+
+def get_topdesk_settings(sik):
+    # type: (str) -> TopdeskSettings
+    return get_integration_settings(sik).data
 
 
 def _get_person_info_from_rogerthat_user(settings, rogerthat_user):
@@ -139,8 +144,9 @@ def topdesk_api_call(settings, path, method=urlfetch.GET, payload=None):
 def get_topdesk_data(sik, url, username, password):
     # type: (str, str,str,str) -> dict
     paths = [ENDPOINTS[prop] for prop in
-             (PropertyName.ENTRY_TYPE, PropertyName.CALL_TYPE, PropertyName.CATEGORY, PropertyName.SUB_CATEGORY,
-              PropertyName.BRANCH, PropertyName.OPERATOR_GROUP, PropertyName.OPERATOR)]
+             (TopdeskPropertyName.ENTRY_TYPE, TopdeskPropertyName.CALL_TYPE, TopdeskPropertyName.CATEGORY,
+              TopdeskPropertyName.SUB_CATEGORY,
+              TopdeskPropertyName.BRANCH, TopdeskPropertyName.OPERATOR_GROUP, TopdeskPropertyName.OPERATOR)]
     rpcs = []
     for path in paths:
         full_url = '%s/api%s' % (url, path)
@@ -195,11 +201,12 @@ def upload_attachment(sik, topdesk_incident_id, url, file_name):
     payload, payload_content_type = encode_multipart_formdata([
         ('file', (file_name, file_content, content_type)),
     ])
-    settings = get_integration_settings(sik)
+    settings = get_topdesk_settings(sik)
     headers = _get_headers(settings.username, settings.password)  # todo fix
     headers['Content-Type'] = payload_content_type
 
-    response = urlfetch.fetch('%s/api/incidents/id/%s/attachments' % (settings.api_url, topdesk_incident_id),  # todo fix
+    response = urlfetch.fetch('%s/api/incidents/id/%s/attachments' % (settings.api_url, topdesk_incident_id),
+                              # todo fix
                               payload=payload,
                               method=urlfetch.POST,
                               headers=headers,
