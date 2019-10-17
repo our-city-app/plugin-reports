@@ -152,7 +152,7 @@ class IncidentStatus(Enum):
 
 
 class IncidentDetails(NdbModel):
-    status = ndb.StringProperty(indexed=False, choices=[IncidentStatus.all()])
+    status = ndb.StringProperty(indexed=False, choices=IncidentStatus.all())
     title = ndb.StringProperty(indexed=False)
     description = ndb.TextProperty(indexed=False)
     geo_location = ndb.GeoPtProperty(indexed=False)
