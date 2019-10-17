@@ -146,8 +146,13 @@ class RogerthatUser(NdbModel):
         return ndb.Key(cls, user_id, namespace=cls.NAMESPACE)
 
 
+class IncidentStatus(Enum):
+    # TODO real statuses
+    TODO = 'todo'
+
+
 class IncidentDetails(NdbModel):
-    status = ndb.StringProperty(indexed=False)
+    status = ndb.StringProperty(indexed=False, choices=[IncidentStatus.all()])
     title = ndb.StringProperty(indexed=False)
     description = ndb.TextProperty(indexed=False)
     geo_location = ndb.GeoPtProperty(indexed=False)
@@ -155,8 +160,6 @@ class IncidentDetails(NdbModel):
 
 class Incident(NdbModel):
     NAMESPACE = NAMESPACE
-
-    STATUS_TODO = u'todo'
 
     sik = ndb.StringProperty(indexed=True)
     user_id = ndb.StringProperty(indexed=True)

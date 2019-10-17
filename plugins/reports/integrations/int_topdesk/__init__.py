@@ -31,7 +31,8 @@ from plugins.reports.dal import get_integration_settings, get_incident, get_roge
 from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName, TopdeskFieldMappingType
 from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, topdesk_api_call, \
     create_topdesk_person, update_topdesk_person
-from plugins.reports.models import IncidentDetails, Incident, RogerthatUser, TopdeskSettings, IntegrationSettings
+from plugins.reports.models import IncidentDetails, Incident, RogerthatUser, TopdeskSettings, IntegrationSettings, \
+    IncidentStatus
 from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO
@@ -57,7 +58,7 @@ def create_incident(config, rt_user, incident, steps):
 
     brief_description = 'Nieuwe melding'
 
-    incident_details = IncidentDetails(status=Incident.STATUS_TODO)
+    incident_details = IncidentDetails(status=IncidentStatus.TODO)
 
     data = {
         TopdeskPropertyName.CALL_TYPE: {

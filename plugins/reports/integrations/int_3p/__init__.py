@@ -27,7 +27,8 @@ from plugins.reports.bizz.gcs import is_file_available, upload_to_gcs
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import INCIDENTS_QUEUE
 from plugins.reports.dal import get_incident, get_rogerthat_user
-from plugins.reports.models import RogerthatUser, Incident, IncidentDetails, ThreePSettings, IntegrationSettings
+from plugins.reports.models import RogerthatUser, Incident, IncidentDetails, ThreePSettings, IntegrationSettings, \
+    IncidentStatus
 from plugins.rogerthat_api.to import MemberTO
 
 
@@ -139,7 +140,7 @@ def create_incident_xml(incident, rt_user, steps):
     }
     xml = dicttoxml.dicttoxml(work_order, custom_root='Workorder', attr_type=False)
     prettyxml = dicttoxml.parseString(xml).toprettyxml(encoding='utf8')
-    details = IncidentDetails(status=Incident.STATUS_TODO)
+    details = IncidentDetails(status=IncidentStatus.TODO)
     details.title = incident_type
     details.description = '\n'.join(description) if description else None
     if latitude and longitude:

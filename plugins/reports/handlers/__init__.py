@@ -28,7 +28,7 @@ from plugins.reports.bizz import convert_to_item_details_tos, \
     update_incident_vote, get_vote_options
 from plugins.reports.bizz.elasticsearch import search_current
 from plugins.reports.models import Consumer, Incident, IncidentVote, \
-    UserIncidentVote
+    UserIncidentVote, IncidentStatus
 from plugins.reports.to import GetMapItemDetailsResponseTO, \
     GetMapItemsResponseTO, SaveMapItemVoteResponseTO
 
@@ -58,7 +58,7 @@ def _get_items(self):
     lng = params.get('lon')
     distance = params.get('distance')
 #     status = params.get('status')
-    status = Incident.STATUS_TODO  # todo fix status
+    status = IncidentStatus.TODO  # todo fix status
     limit = params.get('limit')
     cursor = params.get('cursor', None)
 
@@ -118,7 +118,7 @@ def _get_details(self):
         items = []
 
     return_detail_result(self, items)
-    
+
 
 class AuthValidationHandler(webapp2.RequestHandler):
 
