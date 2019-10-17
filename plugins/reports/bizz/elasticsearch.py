@@ -23,6 +23,7 @@ import time
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 
+from mcfw.consts import DEBUG
 from plugins.reports.models import ElasticsearchSettings, Incident
 
 
@@ -34,12 +35,18 @@ def get_elasticsearch_config():
     return settings.base_url, settings.auth_username, settings.auth_password
 
 
+def get_reports_index():
+    if DEBUG:
+        return 'debug-reports'
+    return 'reports'
+
+
 def delete_index():
     base_url, es_user, es_passwd = get_elasticsearch_config()
     headers = {
         'Authorization': 'Basic %s' % base64.b64encode("%s:%s" % (es_user, es_passwd))
     }
-    result = urlfetch.fetch('%s/reports' % base_url, method=urlfetch.DELETE, headers=headers, deadline=30)
+    result = urlfetch.fetch('%s/%s' % (base_url, get_reports_index()), method=urlfetch.DELETE, headers=headers, deadline=30)
     logging.info('Deleting reports index: %s %s', result.status_code, result.content)
 
     if result.status_code not in (200, 404):
@@ -68,7 +75,7 @@ def create_index():
 
     json_request = json.dumps(request)
 
-    result = urlfetch.fetch('%s/reports' % base_url, json_request, method=urlfetch.PUT, headers=headers, deadline=30)
+    result = urlfetch.fetch('%s/%s' % (base_url, get_reports_index()), json_request, method=urlfetch.PUT, headers=headers, deadline=30)
     logging.info('Creating reports index: %s %s', result.status_code, result.content)
 
     if result.status_code != 200:
@@ -85,7 +92,7 @@ def delete_doc(uid):
     headers = {
         'Authorization': 'Basic %s' % base64.b64encode("%s:%s" % (es_user, es_passwd))
     }
-    result = urlfetch.fetch('%s/reports/_doc/%s' % (base_url, uid), method=urlfetch.DELETE, headers=headers, deadline=30)
+    result = urlfetch.fetch('%s/%s/_doc/%s' % (base_url, get_reports_index(), uid), method=urlfetch.DELETE, headers=headers, deadline=30)
 
     if result.status_code not in (200, 404):
         logging.info('Deleting reports index: %s %s', result.status_code, result.content)
@@ -106,7 +113,7 @@ def index_doc(uid, data):
 
     json_request = json.dumps(data)
 
-    result = urlfetch.fetch('%s/reports/_doc/%s' % (base_url, uid), json_request, method=urlfetch.PUT, headers=headers, deadline=30)
+    result = urlfetch.fetch('%s/%s/_doc/%s' % (base_url, get_reports_index(), uid), json_request, method=urlfetch.PUT, headers=headers, deadline=30)
     if result.status_code not in (200, 201):
         logging.info('Creating reports index: %s %s', result.status_code, result.content)
         raise Exception('Failed to create index %s', uid)
@@ -201,7 +208,7 @@ def _search(lat, lon, distance, status, cursor, limit, is_new=False):
 
     json_request = json.dumps(d)
 
-    result = urlfetch.fetch('%s/reports/_search' % base_url, json_request, method=urlfetch.POST, headers=headers, deadline=30)
+    result = urlfetch.fetch('%s/%s/_search' % (base_url, get_reports_index()), json_request, method=urlfetch.POST, headers=headers, deadline=30)
     if result.status_code not in (200,):
         logging.info('Search reports: %s %s', result.status_code, result.content)
         raise Exception('Failed to search reports')
