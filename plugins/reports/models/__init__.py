@@ -38,6 +38,10 @@ class ElasticsearchSettings(NdbModel):
         return ndb.Key(cls, u'ElasticsearchSettings', namespace=cls.NAMESPACE)
 
 
+class BaseIntegrationSettings(TO):
+    provider = unicode_property('provider')
+
+
 class TopdeskfieldMapping(TO):
     # id of form step
     step_id = unicode_property('step_id')
@@ -51,11 +55,10 @@ class TopdeskfieldMapping(TO):
     default_value = unicode_property('default_value')
 
 
-class TopdeskSettings(TO):
+class TopdeskSettings(BaseIntegrationSettings):
     api_url = unicode_property('api_url')
     username = unicode_property('username')
     password = unicode_property('password')
-    api_user = unicode_property('api_user')
     call_type_id = unicode_property('call_type_id')
     category_id = unicode_property('category_id')
     sub_category_id = unicode_property('sub_category_id')
@@ -68,7 +71,7 @@ class TopdeskSettings(TO):
     field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)
 
 
-class ThreePSettings(TO):
+class ThreePSettings(BaseIntegrationSettings):
     gcs_bucket_name = unicode_property('gcs_bucket_name')
 
 
@@ -94,8 +97,7 @@ class IntegrationSettings(NdbModel):
     NAMESPACE = NAMESPACE
 
     integration = ndb.StringProperty(indexed=False)
-    params = ndb.JsonProperty()  # todo: remove
-    data = TOProperty(IntegrationSettingsData)
+    data = TOProperty(IntegrationSettingsData())
 
     @property
     def sik(self):

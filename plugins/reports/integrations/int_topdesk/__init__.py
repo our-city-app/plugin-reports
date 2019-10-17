@@ -29,7 +29,8 @@ from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import NAMESPACE
 from plugins.reports.dal import get_integration_settings, get_incident, get_rogerthat_user
 from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName, TopdeskFieldMappingType
-from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, topdesk_api_call
+from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, topdesk_api_call, \
+    create_topdesk_person, update_topdesk_person
 from plugins.reports.models import IncidentDetails, Incident, RogerthatUser, TopdeskSettings, IntegrationSettings
 from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
@@ -43,13 +44,15 @@ SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, W
 def create_incident(config, rt_user, incident, steps):
     # type: (IntegrationSettings, RogerthatUser, Incident, list[BaseFlowStepTO]) -> [bool, dict, IncidentDetails]
     settings = config.data  # type: TopdeskSettings
-    # todo remove ?
-    name_step = get_step(steps, 'message_name')
-    if name_step:
-        pass  # details.name = name_step.get_value().strip() # todo fix
     openid_step = find_step_by_type(steps, Widget.TYPE_OPENID)
     openid_result = openid_step and openid_step.form_result.result  # type: OpenIdWidgetResultTO
-    # todo fix openid_result
+
+    if not settings.unregistered_users:
+        if not rt_user.external_id:
+            rt_user.topdesk_id = create_topdesk_person(settings, rt_user, openid_result)
+        elif openid_result:
+            update_topdesk_person(settings, rt_user, openid_result)
+
     attachments = []
 
     brief_description = 'Nieuwe melding'
@@ -280,7 +283,7 @@ def incident_feedback(sik, incident_id, message):
         logging.error('Could not find topdesk settings for %s', sik)
         return
     logging.debug("incident_feedback for id %s", incident_id)
-    response = topdesk_api_call(settings, '/api/incidents/id/%s' % incident_id)
+    response = topdesk_api_call(settings.data, '/api/incidents/id/%s' % incident_id)
     logging.debug("Incident result from server: %s", response)
     status = response['processingStatus']['name']
 
@@ -288,4 +291,4 @@ def incident_feedback(sik, incident_id, message):
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
     complete_message = u'Uw melding is geüpdatet.\nDe huidige status van uw melding is nu "%s".\n%s' % (status, message)
     try_or_defer(send_rogerthat_message, sik, member, complete_message,
-                 parent_message_key=incident.parent_message_key, json_rpc_id=guid())  # todo fix
+                 parent_message_key=incident.parent_message_key, json_rpc_id=guid())  # todo fix parent_message_key

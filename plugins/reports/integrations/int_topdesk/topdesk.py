@@ -26,7 +26,7 @@ from PIL import Image
 from mcfw.exceptions import HttpBadRequestException
 from plugins.reports.dal import get_integration_settings
 from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName
-from plugins.reports.models import TopdeskSettings
+from plugins.reports.models import TopdeskSettings, RogerthatUser, IntegrationSettings
 from plugins.rogerthat_api.to.messaging.forms import OpenIdWidgetResultTO
 from urllib3 import encode_multipart_formdata
 
@@ -52,6 +52,7 @@ def get_topdesk_settings(sik):
 
 
 def _get_person_info_from_rogerthat_user(settings, rogerthat_user):
+    # type: (TopdeskSettings, RogerthatUser) -> dict
     split_name = rogerthat_user.name.split(' ')
     first_name = split_name[0]
     sur_name = ''
@@ -89,7 +90,8 @@ def _update_person_with_openid_data(person, openid_result):
 
 
 def create_topdesk_person(settings, rogerthat_user, openid_result):
-    person = _get_person_info_from_rogerthat_user(settings, rogerthat_user)
+    # type: (TopdeskSettings, RogerthatUser, OpenIdWidgetResultTO) -> str
+    person = _get_person_info_from_rogerthat_user(settings.data, rogerthat_user)
     if openid_result:
         person = _update_person_with_openid_data(person, openid_result)
     created_person = topdesk_api_call(settings, '/api/persons', urlfetch.POST, person)
@@ -98,9 +100,10 @@ def create_topdesk_person(settings, rogerthat_user, openid_result):
 
 
 def update_topdesk_person(settings, rogerthat_user, openid_result):
+    # type: (TopdeskSettings, RogerthatUser, OpenIdWidgetResultTO) -> dict
     person = _get_person_info_from_rogerthat_user(settings, rogerthat_user)
     person = _update_person_with_openid_data(person, openid_result)
-    url = '/api/persons/id/%s' % rogerthat_user.topdesk_id
+    url = '/api/persons/id/%s' % rogerthat_user.external_id
     updated_person = topdesk_api_call(settings, url, urlfetch.PUT, person)
     logging.debug('Updated topdesk person: %s', updated_person)
     return updated_person
@@ -116,8 +119,9 @@ def _get_headers(username, password):
 
 
 def topdesk_api_call(settings, path, method=urlfetch.GET, payload=None):
-    full_url = '%s%s' % (settings.params['api_url'], path)
-    headers = _get_headers(settings.params['username'], settings.params['password'])
+    # type: (TopdeskSettings, str, int, dict) -> dict
+    full_url = '%s%s' % (settings.api_url, path)
+    headers = _get_headers(settings.username, settings.password)
     response = urlfetch.fetch(full_url,
                               headers=headers,
                               payload=json.dumps(payload) if payload else None,

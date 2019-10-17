@@ -25,13 +25,13 @@ from framework.bizz.job import run_job
 from framework.utils import guid, try_or_defer
 from mcfw.properties import object_factory
 from mcfw.rpc import returns, arguments, parse_complex_value
-from plugins.reports.bizz.elasticsearch import index_doc
+from plugins.reports.bizz.elasticsearch import index_doc, delete_doc
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, \
     get_integration_settings, get_incident
 from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
 from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
-from plugins.reports.models import Incident, IntegrationSettings, IntegrationProvider
+from plugins.reports.models import Incident, IntegrationProvider
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_MAPPING
 
@@ -62,16 +62,18 @@ def re_index(m_key):
 @returns()
 @arguments(incident=Incident)
 def re_index_incident(incident):
-    # TODO: is this necessary ?
-    # delete_doc(incident.incident_id)
-    doc = {
-        'location': {
-            'lat': incident.details.geo_location.lat,
-            'lon': incident.details.geo_location.lon
-        },
-        'status': incident.details.status
-    }
-    index_doc(incident.incident_id, doc)
+    # type: (Incident) -> None
+    if incident.visible:
+        doc = {
+            'location': {
+                'lat': incident.details.geo_location.lat,
+                'lon': incident.details.geo_location.lon
+            },
+            'status': incident.details.status
+        }
+        index_doc(incident.incident_id, doc)
+    else:
+        delete_doc(incident.incident_id)
 
 
 def process_incident(sik, user_details, parent_message_key, steps, timestamp):
