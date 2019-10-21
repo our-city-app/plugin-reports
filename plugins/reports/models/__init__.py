@@ -23,6 +23,7 @@ from mcfw.properties import unicode_property, object_factory, unicode_list_prope
     typed_property
 from plugins.reports.consts import NAMESPACE
 from plugins.rogerthat_api.plugin_utils import Enum
+from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
 
 
 class ElasticsearchSettings(NdbModel):
@@ -38,8 +39,9 @@ class ElasticsearchSettings(NdbModel):
         return ndb.Key(cls, u'ElasticsearchSettings', namespace=cls.NAMESPACE)
 
 
-class BaseIntegrationSettings(TO):
-    provider = unicode_property('provider')
+class IntegrationProvider(Enum):
+    TOPDESK = u'topdesk'
+    THREE_P = u'3p'
 
 
 class TopdeskfieldMapping(TO):
@@ -55,7 +57,8 @@ class TopdeskfieldMapping(TO):
     default_value = unicode_property('default_value')
 
 
-class TopdeskSettings(BaseIntegrationSettings):
+class TopdeskSettings(TO):
+    provider = unicode_property('provider', default=IntegrationProvider.THREE_P)
     api_url = unicode_property('api_url')
     username = unicode_property('username')
     password = unicode_property('password')
@@ -71,13 +74,9 @@ class TopdeskSettings(BaseIntegrationSettings):
     field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)
 
 
-class ThreePSettings(BaseIntegrationSettings):
+class ThreePSettings(TO):
+    provider = unicode_property('provider', default=IntegrationProvider.THREE_P)
     gcs_bucket_name = unicode_property('gcs_bucket_name')
-
-
-class IntegrationProvider(Enum):
-    TOPDESK = u'topdesk'
-    THREE_P = u'3p'
 
 
 INTEGRATION_SETTINGS_MAPPING = {
@@ -91,6 +90,51 @@ class IntegrationSettingsData(object_factory):
 
     def __init__(self):
         super(IntegrationSettingsData, self).__init__('provider', INTEGRATION_SETTINGS_MAPPING)
+
+
+class IncidentSource(object_factory):
+    FLOW = 1
+
+
+class IncidentParamsFlow(TO):
+    t = long_property('t', default=IncidentSource.FLOW)
+    parent_message_key = unicode_property('parent_message_key')
+    steps = typed_property('steps', FLOW_STEP_TO, True)
+
+
+INCIDENT_PARAMS_MAPPING = {
+    IncidentSource.FLOW: IncidentParamsFlow,
+}
+
+
+class IncidentParams(object_factory):
+    t = long_property('t')
+
+    def __init__(self):
+        super(IncidentParams, self).__init__('t', INCIDENT_PARAMS_MAPPING)
+
+
+class IdName(TO):
+    id = unicode_property('id')
+    name = unicode_property('name')
+
+
+class IntegrationParamsTopdesk(TO):
+    t = unicode_property('t', default=IntegrationProvider.TOPDESK)
+    status = typed_property('status', IdName)  # type: IdName
+    last_message = unicode_property('last_message')  # last message sent by operator
+
+
+INTEGRATION_PARAMS_MAPPING = {
+    IntegrationProvider.TOPDESK: IntegrationParamsTopdesk,
+}
+
+
+class IntegrationParams(object_factory):
+    t = unicode_property('t')
+
+    def __init__(self):
+        super(IntegrationParams, self).__init__('t', INTEGRATION_PARAMS_MAPPING)
 
 
 class IntegrationSettings(NdbModel):
@@ -151,6 +195,10 @@ class IncidentStatus(Enum):
     TODO = 'todo'
 
 
+class IncidentSource(Enum):
+    APP = 'app'
+
+
 class IncidentDetails(NdbModel):
     status = ndb.StringProperty(indexed=False, choices=IncidentStatus.all())
     title = ndb.StringProperty(indexed=False)
@@ -161,23 +209,20 @@ class IncidentDetails(NdbModel):
 class Incident(NdbModel):
     NAMESPACE = NAMESPACE
 
-    sik = ndb.StringProperty(indexed=True)
-    user_id = ndb.StringProperty(indexed=True)
-    report_time = ndb.DateTimeProperty(indexed=True)
-    resolve_time = ndb.DateTimeProperty(indexed=True)
+    sik = ndb.StringProperty()
+    user_id = ndb.StringProperty()
+    report_date = ndb.DateTimeProperty()
+    resolve_time = ndb.DateTimeProperty()
 
-    visible = ndb.BooleanProperty(indexed=True, default=False)
-    cleanup_time = ndb.DateTimeProperty(indexed=True)
+    visible = ndb.BooleanProperty(default=False)
+    cleanup_date = ndb.DateTimeProperty()
 
     integration = ndb.StringProperty(indexed=False)
-    params = ndb.JsonProperty()
-
-    details = ndb.LocalStructuredProperty(IncidentDetails)
-
-# topdesk
-# incident_number = ndb.StringProperty(indexed=True)
-# parent_message_key = ndb.StringProperty(indexed=True)
-# status = ndb.StringProperty(indexed=True)
+    source = ndb.StringProperty(choices=IncidentSource.all())
+    params = TOProperty(IncidentParams())  # type: IncidentParams
+    integration_params = TOProperty(IntegrationParams())  # type: IntegrationParams
+    external_id = ndb.StringProperty()
+    details = ndb.LocalStructuredProperty(IncidentDetails)  # type: IncidentDetails
 
     @property
     def incident_id(self):
@@ -186,6 +231,20 @@ class Incident(NdbModel):
     @classmethod
     def create_key(cls, incident_id):
         return ndb.Key(cls, incident_id, namespace=cls.NAMESPACE)
+
+    @classmethod
+    def get_by_external_id(cls, sik, external_id):
+        return cls.query() \
+            .filter(cls.sik == sik) \
+            .filter(cls.external_id == external_id) \
+            .get()
+
+    @classmethod
+    def list_by_cleanup_date(cls, date):
+        return cls.query() \
+            .filter(cls.cleanup_date != None) \
+            .filter(cls.cleanup_date < date) \
+            .order(cls.cleanup_date, cls.key)
 
 
 class IncidentVote(NdbModel):

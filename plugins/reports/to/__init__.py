@@ -21,7 +21,7 @@ from mcfw.properties import unicode_property, float_property, typed_property, \
 
 
 class ReportsPluginConfiguration(TO):
-    base_url = unicode_property('base_url')
+    google_maps_key = unicode_property('google_maps_key')
 
 
 class GeoPointTO(TO):

@@ -91,7 +91,7 @@ def _update_person_with_openid_data(person, openid_result):
 
 def create_topdesk_person(settings, rogerthat_user, openid_result):
     # type: (TopdeskSettings, RogerthatUser, OpenIdWidgetResultTO) -> str
-    person = _get_person_info_from_rogerthat_user(settings.data, rogerthat_user)
+    person = _get_person_info_from_rogerthat_user(settings, rogerthat_user)
     if openid_result:
         person = _update_person_with_openid_data(person, openid_result)
     created_person = topdesk_api_call(settings, '/api/persons', urlfetch.POST, person)

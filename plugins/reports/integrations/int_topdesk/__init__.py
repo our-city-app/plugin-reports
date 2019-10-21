@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from __future__ import unicode_literals
 
 import json
 import logging
@@ -25,17 +26,18 @@ from google.appengine.ext import deferred, ndb
 
 from framework.plugin_loader import get_config
 from framework.utils import try_or_defer, guid
+from markdown import markdown
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import NAMESPACE
-from plugins.reports.dal import get_integration_settings, get_incident, get_rogerthat_user
+from plugins.reports.dal import get_integration_settings, get_rogerthat_user, get_incident_by_external_id
 from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName, TopdeskFieldMappingType
 from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, topdesk_api_call, \
     create_topdesk_person, update_topdesk_person
 from plugins.reports.models import IncidentDetails, Incident, RogerthatUser, TopdeskSettings, IntegrationSettings, \
-    IncidentStatus
+    IncidentStatus, IncidentParamsFlow, IntegrationParamsTopdesk, IdName
 from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
-from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO
+from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO, FlowStepTO
 from plugins.rogerthat_api.to.messaging.forms import Widget, FormTO, OpenIdWidgetResultTO, LocationWidgetResultTO
 
 SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, Widget.TYPE_DATE_SELECT,
@@ -43,14 +45,15 @@ SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, W
 
 
 def create_incident(config, rt_user, incident, steps):
-    # type: (IntegrationSettings, RogerthatUser, Incident, list[BaseFlowStepTO]) -> [bool, dict, IncidentDetails]
+    # type: (IntegrationSettings, RogerthatUser, Incident, list[FlowStepTO]) -> [bool, dict, IncidentDetails]
     settings = config.data  # type: TopdeskSettings
     openid_step = find_step_by_type(steps, Widget.TYPE_OPENID)
     openid_result = openid_step and openid_step.form_result.result  # type: OpenIdWidgetResultTO
 
     if not settings.unregistered_users:
         if not rt_user.external_id:
-            rt_user.topdesk_id = create_topdesk_person(settings, rt_user, openid_result)
+            rt_user.external_id = create_topdesk_person(settings, rt_user, openid_result)
+            rt_user.put()
         elif openid_result:
             update_topdesk_person(settings, rt_user, openid_result)
 
@@ -101,30 +104,30 @@ def create_incident(config, rt_user, incident, steps):
     custom_values, included_step_ids = get_field_mapping_values(settings, steps)
     logging.info('Updating request data with %s', custom_values)
     data.update(custom_values)
-    result_text = []
+    result_text = []  # list of lines of markdown
     request_step_ids = {mapping.step_id for mapping in settings.field_mapping
                         if mapping.property == TopdeskPropertyName.REQUEST and mapping.step_id not in included_step_ids}
     # Populate the 'request' field and upload attachments
     for step in steps:
         if isinstance(step, FormFlowStepTO) and step.answer_id == FormTO.POSITIVE:
+            val = step.get_value()
             if step.form_type == Widget.TYPE_PHOTO_UPLOAD:
-                attachments.append(step.get_value())
+                attachments.append(val)
                 continue
             elif isinstance(step.form_result.result, OpenIdWidgetResultTO):
                 continue
+            elif isinstance(val, LocationWidgetResultTO):
+                incident_details.geo_location = ndb.GeoPt(val.latitude, val.longitude)
         if step.step_id not in request_step_ids:
             continue
         if isinstance(step, FormFlowStepTO):
+            step_value = step.display_value
             if step.answer_id == FormTO.POSITIVE:
-                if isinstance(step.get_value(), LocationWidgetResultTO):
-                    incident_details.geo_location = ndb.GeoPt(step.get_value().latitude, step.get_value().longitude)
-                    address = reverse_geocode_location(step.get_value())
+                val = step.get_value()
+                if isinstance(val, LocationWidgetResultTO):
+                    address = reverse_geocode_location(val)
                     if address:
                         step_value = '%s\n%s' % (step.display_value, address)
-                    else:
-                        step_value = step.display_value
-                else:
-                    step_value = step.display_value
             else:
                 step_value = step.button
         elif isinstance(step, MessageFlowStepTO):
@@ -136,17 +139,19 @@ def create_incident(config, rt_user, incident, steps):
                 step_value = step.button
         else:
             raise Exception('Unsupported step type %s' % step.step_type)
-        step_value = step_value.replace('\n', '<br>')
         if step.step_type == BaseFlowStepTO.TYPE_MESSAGE or step.form_type in SINGLE_LINE_FORM_TYPES:
             # Question and answer on the same line
-            result_text.append('<b>%s:</b> %s' % (step.message, step_value))
+            result_text.append('**%s:** %s' % (step.message, step_value))
         else:
             # Question and answer on a new line
-            result_text.append('<b>%s</b>' % step.message)
+            result_text.append('**%s**' % step.message)
             result_text.append(step_value)
-        result_text.append('<br>')
-    result_text = '<br>'.join(result_text)
-    data['request'] = result_text
+        result_text.append('\n')
+    result_text = '\n'.join(result_text)
+    data['request'] = markdown(result_text, output_format='html') \
+        .replace('\n', '<br>') \
+        .replace('<p>', '') \
+        .replace('</p>', '<br>')
 
     for key, value in data.items():
         if isinstance(value, dict):
@@ -155,7 +160,6 @@ def create_incident(config, rt_user, incident, steps):
 
     # TODO: add one or more of category/subcategory/calltype to title or description
     incident_details.title = data['briefDescription']
-    # TODO: should be markdown
     incident_details.description = result_text
 
     logging.debug('Creating incident: %s', data)
@@ -171,10 +175,9 @@ def create_incident(config, rt_user, incident, steps):
     visible = all((incident_details.title, incident_details.description, incident_details.geo_location))
     incident.visible = visible
     incident.details = incident_details
-    incident.params.update({
-        'number': response['number'],
-        'status': response['status'],
-    })
+    integration_params = IntegrationParamsTopdesk()
+    integration_params.status = IdName.from_dict(response['processingStatus'])
+    incident.integration_params = integration_params
     incident.external_id = response['id']
 
 
@@ -255,7 +258,7 @@ def _get_topdesk_values(settings, property_name, custom_values):
     resource = ENDPOINTS[property_name]
     query = '?'
     if property_name == TopdeskPropertyName.LOCATION:
-        branch_id = custom_values.get(TopdeskPropertyName.BRANCH, {}).get('id') or settings.branch_id  # todo fix
+        branch_id = custom_values.get(TopdeskPropertyName.BRANCH, {}).get('id') or settings.branch_id
         if not branch_id:
             return []
         query += '&branch=%s' % branch_id
@@ -272,24 +275,35 @@ def get_reverse_value(settings, property_name, value, custom_values):
 
 
 def incident_feedback(sik, incident_id, message):
-    incident = get_incident(incident_id)
+    incident = get_incident_by_external_id(sik, incident_id)
     if not incident:
         logging.debug('Received incident update for incident that is not in our database: %s', incident_id)
-        return
-    if sik != incident.sik:
-        logging.error('Incident sik did not match topdesk sik %s', sik)
         return
     settings = get_integration_settings(sik)
     if not settings:
         logging.error('Could not find topdesk settings for %s', sik)
         return
-    logging.debug("incident_feedback for id %s", incident_id)
+    logging.debug('Received incident feedback: %s', incident_id)
     response = topdesk_api_call(settings.data, '/api/incidents/id/%s' % incident_id)
     logging.debug("Incident result from server: %s", response)
-    status = response['processingStatus']['name']
-
-    rt_user = get_rogerthat_user(incident.user_id)
-    member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
-    complete_message = u'Uw melding is geüpdatet.\nDe huidige status van uw melding is nu "%s".\n%s' % (status, message)
-    try_or_defer(send_rogerthat_message, sik, member, complete_message,
-                 parent_message_key=incident.parent_message_key, json_rpc_id=guid())  # todo fix parent_message_key
+    status = response['processingStatus']
+    params = incident.integration_params  # type: IntegrationParamsTopdesk
+    message_lines = ['Uw melding is geüpdatet.']
+    if params.status.id != status['id']:
+        params.status = IdName.from_dict(status)
+        message_lines.append('De huidige status van uw melding is nu "%s"' % params.status.name)
+    if message and params.last_message != message:
+        params.last_message = message
+        message_lines.append(message)
+    if len(message_lines) == 1:
+        logging.info('Not sending update message to user since nothing has been updated')
+    else:
+        incident.put()
+        rt_user = get_rogerthat_user(incident.user_id)
+        member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
+        complete_message = '\n'.join(message_lines)
+        if isinstance(incident.params, IncidentParamsFlow):
+            try_or_defer(send_rogerthat_message, sik, member, complete_message,
+                         parent_message_key=incident.params.parent_message_key, json_rpc_id=guid())
+        else:
+            raise Exception('Can\'t process incident feedback with invalid params: %s', incident.params)

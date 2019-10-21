@@ -14,66 +14,39 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
-
-from datetime import datetime
 import logging
+from datetime import datetime
 from uuid import uuid4
 
-from google.appengine.ext import ndb, deferred
+from google.appengine.ext import ndb
 
-from framework.bizz.job import run_job
-from framework.utils import guid, try_or_defer
-from mcfw.properties import object_factory
-from mcfw.rpc import returns, arguments, parse_complex_value
-from plugins.reports.bizz.elasticsearch import index_doc, delete_doc
-from plugins.reports.bizz.rogerthat import send_rogerthat_message
-from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, \
-    get_integration_settings, get_incident
+from framework.bizz.job import run_job, MODE_BATCH
+from framework.utils import try_or_defer
+from mcfw.rpc import parse_complex_value
+from plugins.reports.bizz.elasticsearch import re_index_incidents
+from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, get_integration_settings
 from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
 from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
-from plugins.reports.models import Incident, IntegrationProvider
-from plugins.rogerthat_api.to import MemberTO
-from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_MAPPING
+from plugins.reports.models import Incident, IntegrationProvider, IncidentSource, IncidentParamsFlow
+from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
 
 
 def cleanup_timed_out():
-    run_job(cleanup_timed_out_query, [], cleanup_timed_out_worker, [])
+    run_job(cleanup_timed_out_query, [], cleanup_timed_out_worker, [], mode=MODE_BATCH, batch_size=25)
 
 
 def cleanup_timed_out_query():
-    qry = Incident.query()
-    qry = qry.filter(Incident.cleanup_time != None)
-    qry = qry.filter(Incident.cleanup_time < datetime.utcnow())
-    qry = qry.order(Incident.cleanup_time, Incident.key)
-    return qry
+    return Incident.list_by_cleanup_date(datetime.utcnow())
 
 
-def cleanup_timed_out_worker(m_key):
-    re_index(m_key)
-
-
-@returns()
-@arguments(m_key=ndb.Key)
-def re_index(m_key):
-    m = m_key.get()
-    re_index_incident(m)
-
-
-@returns()
-@arguments(incident=Incident)
-def re_index_incident(incident):
-    # type: (Incident) -> None
-    if incident.visible:
-        doc = {
-            'location': {
-                'lat': incident.details.geo_location.lat,
-                'lon': incident.details.geo_location.lon
-            },
-            'status': incident.details.status
-        }
-        index_doc(incident.incident_id, doc)
-    else:
-        delete_doc(incident.incident_id)
+# TODO what is the use of this? cleanup_date is always None
+@ndb.transactional(xg=True)
+def cleanup_timed_out_worker(incident_keys):
+    incidents = ndb.get_multi(incident_keys)  # type: list[Incident]
+    for incident in incidents:
+        incident.cleanup_date = None
+    re_index_incidents(incidents)
+    ndb.put_multi(incidents)
 
 
 def process_incident(sik, user_details, parent_message_key, steps, timestamp):
@@ -91,21 +64,22 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
 
     settings = get_integration_settings(sik)
     if not settings:
-        logging.error('Could not find integration settings for %s' % (sik))
+        logging.error('Could not find integration settings for %s', sik)
         return
+    parsed_steps = parse_complex_value(FLOW_STEP_TO, steps, True)
 
     incident = Incident(key=Incident.create_key(incident_id))
     incident.sik = sik
     incident.user_id = user_id
-    incident.report_time = datetime.utcfromtimestamp(timestamp)
-    incident.resolve_time = None
-    incident.cleanup_time = None
+    incident.report_date = datetime.utcfromtimestamp(timestamp)
+    incident.cleanup_date = None
     incident.integration = settings.integration
-    incident.params = {'source': 'app',
-                       'parent_message_key': parent_message_key,
-                       'steps': steps}
+    incident.source = IncidentSource.APP
+    params = IncidentParamsFlow()
+    params.parent_message_key = parent_message_key
+    params.steps = parsed_steps
+    incident.params = params
 
-    parsed_steps = parse_complex_value(object_factory("step_type", FLOW_STEP_MAPPING), steps, True)
     if settings.integration == IntegrationProvider.TOPDESK:
         create_topdesk_incident(settings, rt_user, incident, parsed_steps)
     elif settings.integration == IntegrationProvider.THREE_P:
@@ -113,19 +87,4 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
     else:
         raise Exception('Unknown integration: %s' % settings.integration)
     incident.put()
-    re_index_incident(incident)
-
-
-def incident_follow_up(from_, regex, subject, body):
-    # todo-later security validate from
-    incident_id = long(regex.groupdict()['incident_id'])
-    incident = get_incident(incident_id)
-    if not incident:
-        logging.debug("Recieved incident update that is not in our database: '%s'" % (incident_id))
-        return
-    rt_user = get_rogerthat_user(incident.user_id)
-    member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
-    parent_message_key = incident.params.get('parent_message_key')
-    deferred.defer(send_rogerthat_message, incident.sik, member, body,
-                   parent_message_key=parent_message_key,
-                   json_rpc_id=guid())
+    try_or_defer(re_index_incidents, [incident])

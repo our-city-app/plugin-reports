@@ -21,7 +21,7 @@ import re
 from google.appengine.api import app_identity
 from google.appengine.ext.webapp.mail_handlers import InboundMailHandler
 
-from plugins.reports.bizz.incidents import incident_follow_up
+from plugins.reports.integrations.int_3p import incident_follow_up
 
 EMAIL_ADDRESS_EXPRESSION = re.compile("([^<]*<(?P<mail1>[^>]+)>.*|(?P<mail2>[^<]*))")
 INCIDENT_FOLLOWUP_EXPRESSION = re.compile("incident\\.(?P<incident_id>.*)\\.followup@%s\\.appspotmail\\.com" % app_identity.get_application_id())

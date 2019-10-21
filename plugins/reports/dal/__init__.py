@@ -71,3 +71,8 @@ def get_rogerthat_user(user_id):
 def get_incident(incident_id):
     # type: (str) -> Incident
     return Incident.create_key(incident_id).get()
+
+
+def get_incident_by_external_id(sik, external_id):
+    # type: (str, str) -> Incident
+    return Incident.get_by_external_id(sik, external_id)

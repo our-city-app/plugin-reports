@@ -21,14 +21,14 @@ from google.appengine.api import app_identity
 from google.appengine.ext import deferred, ndb
 
 import dicttoxml
-from framework.utils import guid
+from framework.utils import guid, try_or_defer
 from mcfw.consts import DEBUG
 from plugins.reports.bizz.gcs import is_file_available, upload_to_gcs
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import INCIDENTS_QUEUE
 from plugins.reports.dal import get_incident, get_rogerthat_user
 from plugins.reports.models import RogerthatUser, Incident, IncidentDetails, ThreePSettings, IntegrationSettings, \
-    IncidentStatus
+    IncidentStatus, IncidentParamsFlow
 from plugins.rogerthat_api.to import MemberTO
 
 
@@ -124,7 +124,7 @@ def create_incident_xml(incident, rt_user, steps):
 
     comment = '\r\n'.join(result_text)
     work_order = {
-        u'dateasked': incident.report_time.isoformat(),
+        u'dateasked': incident.report_date.isoformat(),
         u'description': '\n'.join(description) if description else u'Nieuwe melding',
         u'comment': comment,
         u'type': incident_type,
@@ -169,4 +169,9 @@ def incident_follow_up(from_, regex, subject, body):
         return
     rt_user = get_rogerthat_user(incident.user_id)
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
-    deferred.defer(send_rogerthat_message, incident.sik, member, body, json_rpc_id=guid())  # todo incident.parent_message_key
+    if isinstance(incident.params, IncidentParamsFlow):
+        parent_message_key = incident.params.parent_message_key
+        try_or_defer(send_rogerthat_message, incident.sik, member, body, parent_message_key=parent_message_key,
+                     json_rpc_id=guid())
+    else:
+        raise Exception('Can\'t process incident feedback with invalid params: %s', incident.params)

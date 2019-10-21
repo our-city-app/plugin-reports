@@ -19,7 +19,6 @@ from __future__ import unicode_literals
 
 from framework.plugin_loader import Plugin, get_plugin
 from framework.utils.plugins import Handler
-from mcfw.consts import DEBUG
 from mcfw.rpc import parse_complex_value
 from plugins.reports import rogerthat_callbacks
 from plugins.reports.bizz.rtemail import EmailHandler
@@ -35,8 +34,6 @@ class ReportsPlugin(Plugin):
     def __init__(self, configuration):
         super(ReportsPlugin, self).__init__(configuration)
         self.configuration = parse_complex_value(ReportsPluginConfiguration, configuration, False)
-        if DEBUG:
-            self.configuration.base_url = 'http://localhost:8800'
 
         rogerthat_api_plugin = get_plugin('rogerthat_api')
         assert (isinstance(rogerthat_api_plugin, RogerthatApiPlugin))

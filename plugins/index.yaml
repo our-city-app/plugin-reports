@@ -1,0 +1,5 @@
+indexes:
+  - kind: Incident
+    properties:
+      - name: sik
+      - name: external_id
