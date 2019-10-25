@@ -15,10 +15,9 @@
 #
 # @@license_version:1.5@@
 
-import logging
-
 from google.appengine.ext import ndb
 
+from framework.i18n_utils import translate
 from plugins.reports.models import IncidentVote, UserIncidentVote, Incident
 from plugins.reports.to import MapItemDetailsTO, TextSectionTO, VoteSectionTO, \
     MapItemTO, GeoPointTO, MapIconTO, MapVoteOptionTO
@@ -34,10 +33,10 @@ def update_incident_vote(incident_id, from_option_id, to_option_id):
         vote.positive_count = 0
 
     changed = False
-    if from_option_id and from_option_id == IncidentVote.NEGATIVE:
+    if from_option_id == IncidentVote.NEGATIVE:
         vote.negative_count -= 1
         changed = True
-    if from_option_id and from_option_id == IncidentVote.POSITIVE:
+    if from_option_id == IncidentVote.POSITIVE:
         vote.positive_count -= 1
         changed = True
 
@@ -56,24 +55,24 @@ def update_incident_vote(incident_id, from_option_id, to_option_id):
     return vote
 
 
-def get_vote_options(vote, user_vote):
-    positive_count = vote.positive_count if vote else 0
-    positive_seleted = user_vote.option_id == IncidentVote.POSITIVE if user_vote else False
-    negative_count = vote.negative_count if vote else 0
-    negative_seleted = user_vote.option_id == IncidentVote.NEGATIVE if user_vote else False
+def get_vote_options(vote, user_vote, language):
+    if not vote:
+        vote = IncidentVote()
+    if not user_vote:
+        user_vote = UserIncidentVote()
     return [
         MapVoteOptionTO(id=IncidentVote.POSITIVE,
                         icon=u'fa-thumbs-o-up',
-                        title=u'Het is opgelost',
-                        count=positive_count,
+                        title=translate(language, 'r', 'resolved'),
+                        count=vote.positive_count,
                         color=u'#87CD03',
-                        selected=positive_seleted),
+                        selected=user_vote.option_id == IncidentVote.POSITIVE),
         MapVoteOptionTO(id=IncidentVote.NEGATIVE,
                         icon=u'fa-eye',
-                        title=u'Deze melding ook rapporteren',
-                        count=negative_count,
+                        title=translate(language, 'r', 'also_report_this'),
+                        count=vote.negative_count,
                         color=u'#FE6B00',
-                        selected=negative_seleted)
+                        selected=user_vote.option_id == IncidentVote.NEGATIVE)
     ]
 
 
@@ -91,41 +90,13 @@ def convert_to_item_to(m):
                      description=m.details.description)
 
 
-def convert_to_item_tos(models):
-    # type: (list[Incident]) -> list[MapItemTO]
-    items = []
-    for m in models:
-        try:
-            items.append(convert_to_item_to(m))
-        except:
-            logging.debug('Could not convert incident to MapItemTO: %s', m.incident_id)
-
-    return items
-
-
-def convert_to_item_details_to(user_id, m):
-    # type: (str, Incident) -> MapItemDetailsTO
-    # TODO refactor datastore.get (x2) in for loop
-    vote = IncidentVote.create_key(m.incident_id).get()
-    user_vote = UserIncidentVote.create_key(user_id, m.incident_id).get()
-    return MapItemDetailsTO(id=m.incident_id,
+def convert_to_item_details_to(incident, vote, user_vote, language):
+    # type: (Incident, IncidentVote, UserIncidentVote, unicode) -> MapItemDetailsTO
+    return MapItemDetailsTO(id=incident.incident_id,
                             geometry=[],
                             sections=[
-                                TextSectionTO(title=m.details.title,
-                                              description=m.details.description),
+                                TextSectionTO(title=incident.details.title,
+                                              description=incident.details.description),
                                 VoteSectionTO(id=u'vote1',
-                                              options=get_vote_options(vote, user_vote))
+                                              options=get_vote_options(vote, user_vote, language))
                             ])
-
-
-def convert_to_item_details_tos(user_id, models):
-    # type: (str, list[Incident]) -> list[MapItemDetailsTO]
-    items = []
-    for m in models:
-        try:
-            items.append(convert_to_item_details_to(user_id, m))
-        except:
-            logging.debug('Could not convert incident to MapItemDetailsTO: %s', m.incident_id)
-            raise
-
-    return items

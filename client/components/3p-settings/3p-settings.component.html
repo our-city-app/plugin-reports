@@ -1,0 +1,4 @@
+<mat-form-field *ngIf="settings" style="width: 100%;">
+  <mat-label>GCS bucket name</mat-label>
+  <input name="gcs_bucket_name" matInput [(ngModel)]="settings.gcs_bucket_name" (ngModelChange)="changed()">
+</mat-form-field>

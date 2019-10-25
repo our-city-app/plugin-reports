@@ -27,6 +27,7 @@ from google.appengine.ext import deferred, ndb
 from framework.plugin_loader import get_config
 from framework.utils import try_or_defer, guid
 from markdown import markdown
+from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import NAMESPACE
 from plugins.reports.dal import get_integration_settings, get_rogerthat_user, get_incident_by_external_id
@@ -39,13 +40,14 @@ from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO, FlowStepTO
 from plugins.rogerthat_api.to.messaging.forms import Widget, FormTO, OpenIdWidgetResultTO, LocationWidgetResultTO
+from typing import List, Dict
 
 SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, Widget.TYPE_DATE_SELECT,
                           Widget.TYPE_RANGE_SLIDER)
 
 
 def create_incident(config, rt_user, incident, steps):
-    # type: (IntegrationSettings, RogerthatUser, Incident, list[FlowStepTO]) -> [bool, dict, IncidentDetails]
+    # type: (IntegrationSettings, RogerthatUser, Incident, List[FlowStepTO]) -> [bool, Dict, IncidentDetails]
     settings = config.data  # type: TopdeskSettings
     openid_step = find_step_by_type(steps, Widget.TYPE_OPENID)
     openid_result = openid_step and openid_step.form_result.result  # type: OpenIdWidgetResultTO
@@ -61,7 +63,7 @@ def create_incident(config, rt_user, incident, steps):
 
     brief_description = 'Nieuwe melding'
 
-    incident_details = IncidentDetails(status=IncidentStatus.TODO)
+    incident_details = IncidentDetails(status=IncidentStatus.NEW)
 
     data = {
         TopdeskPropertyName.CALL_TYPE: {
@@ -288,6 +290,13 @@ def incident_feedback(sik, incident_id, message):
     logging.debug("Incident result from server: %s", response)
     status = response['processingStatus']
     params = incident.integration_params  # type: IntegrationParamsTopdesk
+    updated = True
+    if response['closed']:
+        incident.details.status = IncidentStatus.RESOLVED
+    elif incident.details.status == IncidentStatus.NEW:
+        incident.details.status = IncidentStatus.IN_PROGRESS
+    else:
+        updated = False
     message_lines = ['Uw melding is geüpdatet.']
     if params.status.id != status['id']:
         params.status = IdName.from_dict(status)
@@ -295,10 +304,13 @@ def incident_feedback(sik, incident_id, message):
     if message and params.last_message != message:
         params.last_message = message
         message_lines.append(message)
+        updated = True
+    if updated:
+        incident.put()
+        try_or_defer(re_index_incident, incident)
     if len(message_lines) == 1:
         logging.info('Not sending update message to user since nothing has been updated')
     else:
-        incident.put()
         rt_user = get_rogerthat_user(incident.user_id)
         member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
         complete_message = '\n'.join(message_lines)

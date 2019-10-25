@@ -151,16 +151,22 @@ class MapItemDetailsTO(TO):
 
 
 class GetMapItemsResponseTO(TO):
-    cursor = unicode_property('1')
-    items = typed_property('2', MapItemTO, True)
-    distance = long_property('3')
+    cursor = unicode_property('1', default=None)
+    items = typed_property('2', MapItemTO, True, default=[])
+    distance = long_property('3', default=0)
 
 
 class GetMapItemDetailsResponseTO(TO):
-    items = typed_property('1', MapItemDetailsTO, True)
+    items = typed_property('1', MapItemDetailsTO, True, default=[])
 
 
 class SaveMapItemVoteResponseTO(TO):
     item_id = unicode_property('item_id')
     vote_id = unicode_property('vote_id')
     options = typed_property('options', MapVoteOptionTO, True)
+
+
+class ItemVoteTO(TO):
+    user_id = unicode_property('user_id', default=None)
+    vote_id = unicode_property('vote_id', default=None)
+    option_id = unicode_property('option_id', default=None)

@@ -20,14 +20,14 @@ import itertools
 import json
 import logging
 import time
-from collections import Iterable
-from types import GeneratorType
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 
 from mcfw.consts import DEBUG
+from plugins.reports.bizz import convert_to_item_to
 from plugins.reports.models import ElasticsearchSettings, Incident
+from typing import Generator, Dict, Iterable, List, Tuple
 
 
 def get_elasticsearch_config():
@@ -39,7 +39,7 @@ def get_elasticsearch_config():
 
 
 def _request(path, method=urlfetch.GET, payload=None, allowed_status_codes=(200, 204)):
-    # type: (str, int, dict, tuple[int]) -> dict
+    # type: (str, int, Dict, Tuple[int]) -> Dict
     config = get_elasticsearch_config()
     headers = {
         'Accept': 'application/json',
@@ -54,7 +54,7 @@ def _request(path, method=urlfetch.GET, payload=None, allowed_status_codes=(200,
     url = config.base_url + path
     if DEBUG:
         logging.debug(url)
-    result = urlfetch.fetch(url, data, method, headers, deadline=30)
+    result = urlfetch.fetch(url, data, method, headers, deadline=30)  # type: urlfetch._URLFetchResult
     if result.status_code not in allowed_status_codes:
         logging.debug(result.content)
         raise Exception('Invalid response from elasticsearch: %s' % result.status_code)
@@ -64,7 +64,7 @@ def _request(path, method=urlfetch.GET, payload=None, allowed_status_codes=(200,
 
 
 def execute_bulk_request(operations):
-    # type: (Iterable[dict]) -> list[dict]
+    # type: (Iterable[Dict]) -> List[Dict]
     path = '/%s/_bulk' % get_reports_index()
     # NDJSON
     payload = '\n'.join([json.dumps(op) for op in operations])
@@ -110,7 +110,7 @@ def create_index():
 
 
 def index_incident(incident):
-    # type: (Incident) -> GeneratorType[dict]
+    # type: (Incident) -> Generator[Dict]
     if incident.visible:
         doc = {
             'location': {
@@ -133,21 +133,23 @@ def index_doc_operations(uid, doc):
     yield doc
 
 
+def re_index_incident(incident):
+    # type: (Incident) -> List[Dict]
+    return execute_bulk_request(index_incident(incident))
+
+
 def re_index_incidents(incidents):
-    # type: (list[Incident]) -> list[dict]
+    # type: (List[Incident]) -> List[Dict]
     operations = itertools.chain.from_iterable([index_incident(incident) for incident in incidents])
     return execute_bulk_request(operations)
 
 
 def search_current(lat, lon, distance, status, cursor=None, limit=10):
-    from plugins.reports.bizz import convert_to_item_tos
     start_time = time.time()
     new_cursor, result_data = _search(lat, lon, distance, status, cursor, limit)
     took_time = time.time() - start_time
     logging.info('debugging.search_current _search {0:.3f}s'.format(took_time))
     keys = {Incident.create_key(hit['_id']) for hit in result_data['hits']['hits']}
-    took_time = time.time() - start_time
-    logging.info('debugging.search_current hits {0:.3f}s'.format(took_time))
 
     if keys:
         start_time = time.time()
@@ -156,7 +158,7 @@ def search_current(lat, lon, distance, status, cursor=None, limit=10):
         logging.info('debugging.search_current ndb.get_multi {0:.3f}s'.format(took_time))
 
         start_time = time.time()
-        items = convert_to_item_tos(models)
+        items = [convert_to_item_to(model) for model in models]
         took_time = time.time() - start_time
         logging.info('debugging.search_current convert_to_item_tos {0:.3f}s'.format(took_time))
     else:
@@ -182,34 +184,31 @@ def _search(lat, lon, distance, status, cursor, limit):
                 'must': {
                     'match_all': {}
                 },
-                'filter': [
-                    {
-                        'geo_distance': {
-                            'distance': '%sm' % distance,
-                            'location': {
-                                'lat': lat,
-                                'lon': lon
-                            }
-                        }
-                    },
-                    {
-                        'term': {
-                            'status': status
+                'filter': [{
+                    'geo_distance': {
+                        'distance': '%sm' % distance,
+                        'location': {
+                            'lat': lat,
+                            'lon': lon
                         }
                     }
-                ]
+                }, {
+                    'term': {
+                        'status': status
+                    }
+                }]
             }
         },
-        'sort': [
-            {'_geo_distance': {
+        'sort': [{
+            '_geo_distance': {
                 'location': {
                     'lat': lat,
                     'lon': lon
                 },
                 'order': 'asc',
-                'unit': 'm'}
+                'unit': 'm'
             }
-        ]
+        }]
     }
     path = '/%s/_search' % get_reports_index()
     result_data = _request(path, urlfetch.POST, d)

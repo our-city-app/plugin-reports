@@ -14,33 +14,44 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from google.appengine.ext import ndb
 
-from mcfw.rpc import returns, arguments
-from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident
+from mcfw.consts import MISSING
+from mcfw.exceptions import HttpNotFoundException
+from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident, \
+    TopdeskSettings
 from plugins.rogerthat_api.to import UserDetailsTO
 
 
-@returns()
-@arguments(sik=unicode, integration=unicode, data=IntegrationSettingsData)
-def save_integration_settings(sik, integration, data):
+def save_integration_settings(sik, name, data):
     # type: (str, str, IntegrationSettingsData) -> IntegrationSettings
     k = IntegrationSettings.create_key(sik)
     settings = k.get() or IntegrationSettings(key=k)
-    settings.integration = integration
+    settings.integration = data.provider
+    settings.name = name
+    to_put = [settings]
+    if isinstance(settings.data, TopdeskSettings):
+        if settings.data.consumer and settings.data.consumer is not MISSING:
+            Consumer.create_key(settings.data.consumer).delete()
+    if isinstance(data, TopdeskSettings):
+        to_put.append(Consumer(key=Consumer.create_key(data.consumer), ref=name, sik=sik))
     settings.data = data
-    settings.put()
+    ndb.put_multi(to_put)
     return settings
 
 
-@returns(IntegrationSettings)
-@arguments(sik=unicode)
+def list_integrations():
+    return IntegrationSettings.list()
+
+
 def get_integration_settings(sik):
     # type: (str) -> IntegrationSettings
-    return IntegrationSettings.create_key(sik).get()
+    settings = IntegrationSettings.create_key(sik).get()
+    if not settings:
+        raise HttpNotFoundException('settings_not_found', {'sik': sik})
+    return settings
 
 
-@returns(Consumer)
-@arguments(consumer_key=unicode)
 def get_consumer(consumer_key):
     # type: (str) -> Consumer
     return Consumer.create_key(consumer_key).get()

@@ -1,0 +1,37 @@
+{
+  "Reports": "Reports",
+  "r": {
+    "also_report_this": "Also report this",
+    "api_url": "API url",
+    "back": "Back",
+    "branch": "Branch",
+    "call_type": "Call type",
+    "caller_branch": "Caller branch",
+    "category": "Category",
+    "consumer_hint": "Shared secret between this server and remote server",
+    "create_integration": "Create integration",
+    "edit_integration": "Edit integration",
+    "enabled": "Enabled",
+    "entry_type": "Entry type",
+    "err_unknown": "An error has occurred, please try again later.",
+    "integrations": "Integrations",
+    "name": "Name",
+    "operator": "Operator",
+    "operator_group": "Operator group",
+    "password": "Password",
+    "perms": {
+      "integrations": "Integrations",
+      "integrations_admin": "Integrations administrator"
+    },
+    "property": "Property",
+    "provider": "Provider",
+    "resolved": "Resolved",
+    "service_identity_key": "Service identity key",
+    "settings": "Settings",
+    "sub_category": "Subcategory",
+    "submit": "Submit",
+    "topdesk": "TOPdesk",
+    "unregistered_users": "Unregistered users",
+    "username": "Username"
+  }
+}

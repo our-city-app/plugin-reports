@@ -1,0 +1,22 @@
+{
+  "projects": {
+    "gae-plugin-framework-cli": {
+      "architect": {
+        "build": {
+          "options": {
+            "styles": [
+              "src/reports/client/styles/reports.scss"
+            ]
+          }
+        },
+        "test": {
+          "options": {
+            "styles": [
+              "src/reports/client/styles/reports.scss"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

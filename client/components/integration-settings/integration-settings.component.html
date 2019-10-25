@@ -1,0 +1,31 @@
+<form #form="ngForm" (ngSubmit)="submit(form)" class="integration-settings">
+  <mat-form-field>
+    <mat-label>{{ 'r.provider' | translate }}</mat-label>
+  <mat-select name="provider" [(ngModel)]="settings.data.provider" (ngModelChange)="setDefaultSettings($event)"
+              [disabled]="isEdit">
+    <mat-option *ngFor="let provider of integrationProviders"
+                [value]="provider.value">{{ provider.label }}</mat-option>
+  </mat-select>
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>{{ 'r.service_identity_key' | translate }}</mat-label>
+    <input name="sik" matInput [(ngModel)]="settings.sik" required [readonly]="isEdit">
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>{{ 'r.name' | translate }}</mat-label>
+    <input name="name" matInput [(ngModel)]="settings.name" required>
+  </mat-form-field>
+  <ng-container [ngSwitch]="settings.data.provider">
+    <r-topdesk-settings name="data"
+                        [(ngModel)]="settings.data"
+                        [data]="topdeskData$ | async"
+                        (loadData)="onLoadData($event)"
+                        *ngSwitchCase="IntegrationProvider.TOPDESK"></r-topdesk-settings>
+    <r-3p-settings name="data"
+                   [(ngModel)]="settings.data"
+                   *ngSwitchCase="IntegrationProvider.THREE_P"></r-3p-settings>
+  </ng-container>
+  <div>
+    <button mat-raised-button>{{ 'r.submit' | translate }}</button>
+  </div>
+</form>

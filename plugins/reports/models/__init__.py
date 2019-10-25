@@ -72,6 +72,7 @@ class TopdeskSettings(TO):
     branch_id = unicode_property('branch_id')
     unregistered_users = bool_property('unregistered_users')
     field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)
+    consumer = unicode_property('consumer')
 
 
 class ThreePSettings(TO):
@@ -90,6 +91,9 @@ class IntegrationSettingsData(object_factory):
 
     def __init__(self):
         super(IntegrationSettingsData, self).__init__('provider', INTEGRATION_SETTINGS_MAPPING)
+
+
+INTEGRATION_SETTINGS_DATA = IntegrationSettingsData()
 
 
 class IncidentSource(object_factory):
@@ -141,15 +145,23 @@ class IntegrationSettings(NdbModel):
     NAMESPACE = NAMESPACE
 
     integration = ndb.StringProperty(indexed=False)
-    data = TOProperty(IntegrationSettingsData())
+    name = ndb.StringProperty()
+    data = TOProperty(INTEGRATION_SETTINGS_DATA)
 
     @property
     def sik(self):
         return self.key.id().decode('utf8')
 
+    def to_dict(self, extra_properties=None, include=None, exclude=None):
+        return super(IntegrationSettings, self).to_dict(extra_properties=extra_properties or ['sik'])
+
     @classmethod
     def create_key(cls, sik):
         return ndb.Key(cls, sik, namespace=NAMESPACE)
+
+    @classmethod
+    def list(cls):
+        return cls.query().order(cls.name)
 
 
 class Consumer(NdbModel):
@@ -191,8 +203,15 @@ class RogerthatUser(NdbModel):
 
 
 class IncidentStatus(Enum):
-    # TODO real statuses
-    TODO = 'todo'
+    NEW = 'new'
+    IN_PROGRESS = 'in_progress'
+    RESOLVED = 'resolved'
+
+
+class ReportsFilter(Enum):
+    NEW = 'reported'
+    IN_PROGRESS = 'in_progress'
+    RESOLVED = 'resolved'
 
 
 class IncidentSource(Enum):
@@ -253,8 +272,8 @@ class IncidentVote(NdbModel):
     NEGATIVE = u'negative'
     POSITIVE = u'positive'
 
-    negative_count = ndb.IntegerProperty(indexed=False)
-    positive_count = ndb.IntegerProperty(indexed=False)
+    negative_count = ndb.IntegerProperty(indexed=False, default=0)
+    positive_count = ndb.IntegerProperty(indexed=False, default=0)
 
     @property
     def incident_id(self):

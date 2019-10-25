@@ -145,8 +145,8 @@ def topdesk_api_call(settings, path, method=urlfetch.GET, payload=None):
     return json.loads(response.content) if response.content else None
 
 
-def get_topdesk_data(sik, url, username, password):
-    # type: (str, str,str,str) -> dict
+def get_topdesk_data(url, username, password):
+    # type: (str,str,str) -> dict
     paths = [ENDPOINTS[prop] for prop in
              (TopdeskPropertyName.ENTRY_TYPE, TopdeskPropertyName.CALL_TYPE, TopdeskPropertyName.CATEGORY,
               TopdeskPropertyName.SUB_CATEGORY,
@@ -165,7 +165,6 @@ def get_topdesk_data(sik, url, username, password):
         logging.debug('Failed to exec rpc to topdesk', exc_info=True)
         raise HttpBadRequestException('%s: %s' % (rpcs[0].get_result().status_code, rpcs[0].get_result().content))
     return {
-        'sik': sik,
         'entryTypes': entry_types,
         'callTypes': call_types,
         'categories': categories,

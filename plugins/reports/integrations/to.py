@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2019 Green Valley Belgium NV
+# Copyright 2019 Green Valley NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,3 +14,20 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from framework.to import TO
+from mcfw.properties import typed_property, unicode_property
+from plugins.reports.models import INTEGRATION_SETTINGS_DATA
+
+
+class IntegrationTO(TO):
+    name = unicode_property('name')
+    sik = unicode_property('dik')
+    data = typed_property('data', INTEGRATION_SETTINGS_DATA)
+
+    @classmethod
+    def from_model(cls, model):
+        return cls(
+            sik=model.sik,
+            name=model.name,
+            data=model.data,
+        )

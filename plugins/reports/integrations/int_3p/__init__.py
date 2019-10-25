@@ -23,6 +23,7 @@ from google.appengine.ext import deferred, ndb
 import dicttoxml
 from framework.utils import guid, try_or_defer
 from mcfw.consts import DEBUG
+from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.bizz.gcs import is_file_available, upload_to_gcs
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import INCIDENTS_QUEUE
@@ -140,7 +141,7 @@ def create_incident_xml(incident, rt_user, steps):
     }
     xml = dicttoxml.dicttoxml(work_order, custom_root='Workorder', attr_type=False)
     prettyxml = dicttoxml.parseString(xml).toprettyxml(encoding='utf8')
-    details = IncidentDetails(status=IncidentStatus.TODO)
+    details = IncidentDetails(status=IncidentStatus.NEW)
     details.title = incident_type
     details.description = '\n'.join(description) if description else None
     if latitude and longitude:
@@ -165,10 +166,14 @@ def incident_follow_up(from_, regex, subject, body):
     incident_id = long(regex.groupdict()['incident_id'])
     incident = get_incident(incident_id)
     if not incident:
-        logging.debug("Recieved incident update that is not in our database: '%s'" % (incident_id))
+        logging.debug("Received incident update that is not in our database: '%s'", incident_id)
         return
     rt_user = get_rogerthat_user(incident.user_id)
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
+    if incident.details.status == IncidentStatus.NEW:
+        incident.details.status = IncidentStatus.IN_PROGRESS
+        incident.put()
+        try_or_defer(re_index_incident, incident)
     if isinstance(incident.params, IncidentParamsFlow):
         parent_message_key = incident.params.parent_message_key
         try_or_defer(send_rogerthat_message, incident.sik, member, body, parent_message_key=parent_message_key,

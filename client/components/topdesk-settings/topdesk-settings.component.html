@@ -1,0 +1,92 @@
+<div *ngIf="settings" class="r-topdesk-settings">
+  <mat-form-field>
+    <mat-label>{{ 'r.secret' | translate }}</mat-label>
+    <input name="consumer" matInput [(ngModel)]="settings.consumer" required>
+    <mat-hint>{{ 'r.consumer_hint' | translate }}</mat-hint>
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>{{ 'r.api_url' | translate }}</mat-label>
+    <input name="api_url" matInput [(ngModel)]="settings.api_url" (ngModelChange)="loadDataIfNeeded()" required>
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>{{ 'r.username' | translate }}</mat-label>
+    <input name="username" matInput [(ngModel)]="settings.username" (ngModelChange)="loadDataIfNeeded()" required>
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>{{ 'r.password' | translate }}</mat-label>
+    <input type="password" name="password" matInput [(ngModel)]="settings.password" (ngModelChange)="loadDataIfNeeded()"
+           required autocomplete="false">
+  </mat-form-field>
+  <mat-slide-toggle name="unregisterd_users" [(ngModel)]="settings.unregistered_users">
+    {{ 'r.unregistered_users' | translate }}
+  </mat-slide-toggle>
+  <ng-container *ngIf="data">
+    <mat-form-field>
+      <mat-label>{{ 'r.caller_branch' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.caller_branch_id" name="caller_branch_id" (ngModelChange)="changed()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let branch of data.branches" [value]="branch.id">
+          {{ branch.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'r.category' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.category_id" name="category_id" (ngModelChange)="categoryChanged()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let category of data.categories" [value]="category.id">
+          {{ category.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'r.sub_category' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.sub_category_id" name="sub_category" (ngModelChange)="changed()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let subCat of categories[settings.category_id]" [value]="subCat.id">
+          {{subCat.name}}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'r.entry_type' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.entry_type_id" name="entry_type" (ngModelChange)="changed()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let entryType of data.entryTypes" [value]="entryType.id">{{entryType.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'r.call_type' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.call_type_id" name="call_type" (ngModelChange)="changed()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let type of data.callTypes" [value]="type.id">{{type.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'r.branch' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.branch_id" name="branch_id" (ngModelChange)="changed()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let branch of data.branches" [value]="branch.id">{{branch.name}}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'r.operator_group' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.operator_group_id" name="operator_group_id" (ngModelChange)="changed()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let opGroup of data.operatorGroups" [value]="opGroup.id">
+          {{ opGroup.groupName }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>{{ 'r.operator' | translate }}</mat-label>
+      <mat-select [(ngModel)]="settings.operator_id" name="operator_id" (ngModelChange)="changed()">
+        <mat-option [value]="null">-</mat-option>
+        <mat-option *ngFor="let op of data.operators" [value]="op.id">
+          {{ op.firstName }} {{ op.surName }} ({{ op.loginName }})
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </ng-container>
+  <r-topdesk-field-mapping name="field_mapping" [(ngModel)]="settings.field_mapping"></r-topdesk-field-mapping>
+</div>

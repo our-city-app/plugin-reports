@@ -23,12 +23,13 @@ from google.appengine.ext import ndb
 from framework.bizz.job import run_job, MODE_BATCH
 from framework.utils import try_or_defer
 from mcfw.rpc import parse_complex_value
-from plugins.reports.bizz.elasticsearch import re_index_incidents
+from plugins.reports.bizz.elasticsearch import re_index_incidents, re_index_incident
 from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, get_integration_settings
 from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
 from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
 from plugins.reports.models import Incident, IntegrationProvider, IncidentSource, IncidentParamsFlow
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
+from typing import List
 
 
 def cleanup_timed_out():
@@ -42,7 +43,7 @@ def cleanup_timed_out_query():
 # TODO what is the use of this? cleanup_date is always None
 @ndb.transactional(xg=True)
 def cleanup_timed_out_worker(incident_keys):
-    incidents = ndb.get_multi(incident_keys)  # type: list[Incident]
+    incidents = ndb.get_multi(incident_keys)  # type: List[Incident]
     for incident in incidents:
         incident.cleanup_date = None
     re_index_incidents(incidents)
@@ -87,4 +88,4 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
     else:
         raise Exception('Unknown integration: %s' % settings.integration)
     incident.put()
-    try_or_defer(re_index_incidents, [incident])
+    try_or_defer(re_index_incident, incident)
