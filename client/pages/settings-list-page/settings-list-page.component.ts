@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
 import { select, Store } from '@ngrx/store';
 import { Observable } from 'rxjs';
-import { IntegrationSettings } from '../../interfaces';
+import { IntegrationList } from '../../interfaces';
 import { ListSettingsAction } from '../../reports.actions';
 import { IReportsState, listIntegrations } from '../../reports.state';
 
@@ -11,7 +11,7 @@ import { IReportsState, listIntegrations } from '../../reports.state';
   templateUrl: 'settings-list-page.component.html',
 })
 export class SettingsListPageComponent implements OnInit {
-  settings$: Observable<IntegrationSettings[]>;
+  settings$: Observable<IntegrationList>;
 
   constructor(private store: Store<IReportsState>) {
   }

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { IntegrationSettings, TopdeskData, TopdeskSettings } from './interfaces';
+import { IntegrationList, IntegrationSettings, TopdeskData, TopdeskSettings } from './interfaces';
 import { ReportsConfig } from './reports-config';
 
 @Injectable({ providedIn: 'root' })
@@ -9,7 +9,7 @@ export class ReportsService {
   }
 
   listSettings() {
-    return this.http.get<IntegrationSettings[]>(`${ReportsConfig.API_URL}/integrations`);
+    return this.http.get<IntegrationList>(`${ReportsConfig.API_URL}/integrations`);
   }
 
   getSettings(sik: string) {

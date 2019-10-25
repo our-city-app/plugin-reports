@@ -63,6 +63,7 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
       case IntegrationProvider.TOPDESK:
         this.settings = {
           name: 'TOPdesk',
+          rogerthat_api_key: '',
           sik: '',
           data: {
             provider,
@@ -87,6 +88,7 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
         this.settings = {
           name: '3P',
           sik: '',
+          rogerthat_api_key: '',
           data: {
             provider,
             gcs_bucket_name: '',

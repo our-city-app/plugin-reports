@@ -1,9 +1,9 @@
 import { createFeatureSelector, createSelector } from '@ngrx/store';
 import { CallStateType, initialStateResult, ResultState } from '../../framework/client/rpc';
-import { IntegrationSettings, TopdeskData } from './interfaces';
+import { IntegrationList, IntegrationSettings, TopdeskData } from './interfaces';
 
 export interface IReportsState {
-  integrations: ResultState<IntegrationSettings[]>;
+  integrations: ResultState<IntegrationList>;
   settings: ResultState<IntegrationSettings>;
   topdeskData: ResultState<TopdeskData>;
 }

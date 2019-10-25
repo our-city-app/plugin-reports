@@ -12,6 +12,10 @@
     <input name="sik" matInput [(ngModel)]="settings.sik" required [readonly]="isEdit">
   </mat-form-field>
   <mat-form-field>
+    <mat-label>{{ 'r.rogerthat_api_key' | translate }}</mat-label>
+    <input name="rogerthat_api_key" matInput [(ngModel)]="settings.rogerthat_api_key" required>
+  </mat-form-field>
+  <mat-form-field>
     <mat-label>{{ 'r.name' | translate }}</mat-label>
     <input name="name" matInput [(ngModel)]="settings.name" required>
   </mat-form-field>

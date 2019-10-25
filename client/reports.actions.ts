@@ -1,5 +1,5 @@
 import { Action } from '@ngrx/store';
-import { IntegrationSettings, TopdeskData, TopdeskSettings } from './interfaces';
+import { IntegrationList, IntegrationSettings, TopdeskData, TopdeskSettings } from './interfaces';
 
 export const enum ReportsActionTypes {
   LIST_SETTINGS = '[Reports] List settings',
@@ -23,7 +23,7 @@ export class ListSettingsAction implements Action {
 export class ListSettingsCompleteAction implements Action {
   readonly type = ReportsActionTypes.LIST_SETTINGS_COMPLETE;
 
-  constructor(public payload: IntegrationSettings[]) {
+  constructor(public payload: IntegrationList) {
   }
 }
 

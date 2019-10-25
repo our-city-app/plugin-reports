@@ -96,8 +96,11 @@ export interface ThreePSettings {
 
 export type IntegrationSettingsData = TopdeskSettings | ThreePSettings;
 
+export type IntegrationList = { sik: string; name: string }[];
+
 export interface IntegrationSettings {
   name: string;
   sik: string;
+  rogerthat_api_key: string;
   data: IntegrationSettingsData;
 }

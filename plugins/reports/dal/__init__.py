@@ -20,16 +20,21 @@ from mcfw.consts import MISSING
 from mcfw.exceptions import HttpNotFoundException
 from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident, \
     TopdeskSettings
+from plugins.rogerthat_api.models.settings import RogerthatSettings
 from plugins.rogerthat_api.to import UserDetailsTO
+from typing import List, Tuple
 
 
-def save_integration_settings(sik, name, data):
-    # type: (str, str, IntegrationSettingsData) -> IntegrationSettings
+def save_integration_settings(sik, rogerthat_api_key, name, data):
+    # type: (str, str, str, IntegrationSettingsData) -> Tuple[IntegrationSettings, RogerthatSettings]
     k = IntegrationSettings.create_key(sik)
     settings = k.get() or IntegrationSettings(key=k)
     settings.integration = data.provider
     settings.name = name
-    to_put = [settings]
+    rogerthat_settings = RogerthatSettings(key=RogerthatSettings.create_key(sik))
+    rogerthat_settings.ref = name
+    rogerthat_settings.api_key = rogerthat_api_key
+    to_put = [settings, rogerthat_settings]
     if isinstance(settings.data, TopdeskSettings):
         if settings.data.consumer and settings.data.consumer is not MISSING:
             Consumer.create_key(settings.data.consumer).delete()
@@ -37,19 +42,20 @@ def save_integration_settings(sik, name, data):
         to_put.append(Consumer(key=Consumer.create_key(data.consumer), ref=name, sik=sik))
     settings.data = data
     ndb.put_multi(to_put)
-    return settings
+    return settings, rogerthat_settings
 
 
 def list_integrations():
+    # type: () -> List[IntegrationSettings]
     return IntegrationSettings.list()
 
 
 def get_integration_settings(sik):
-    # type: (str) -> IntegrationSettings
-    settings = IntegrationSettings.create_key(sik).get()
+    # type: (str) -> Tuple[IntegrationSettings, RogerthatSettings]
+    settings, rt_settings = ndb.get_multi([IntegrationSettings.create_key(sik), RogerthatSettings.create_key(sik)])
     if not settings:
         raise HttpNotFoundException('settings_not_found', {'sik': sik})
-    return settings
+    return settings, rt_settings
 
 
 def get_consumer(consumer_key):

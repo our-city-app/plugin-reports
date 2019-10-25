@@ -24,17 +24,17 @@ from plugins.reports.permissions import ReportsPermission
 
 
 @rest('/integrations', 'get', silent_result=True, scopes=ReportsPermission.LIST_INTEGRATIONS)
-@returns([IntegrationTO])
+@returns([dict])
 @arguments()
 def api_list_settings():
-    return [IntegrationTO.from_model(integration) for integration in list_integrations()]
+    return [{'sik': integration.sik, 'name': integration.name} for integration in list_integrations()]
 
 
 @rest('/integrations/<sik:[^/]+>', 'get', silent_result=True, scopes=ReportsPermission.GET_INTEGRATION)
 @returns(IntegrationTO)
 @arguments(sik=unicode)
 def api_get_settings(sik):
-    return IntegrationTO.from_model(get_integration_settings(sik))
+    return IntegrationTO.from_model(*get_integration_settings(sik))
 
 
 @rest('/integrations/<sik:[^/]+>', 'put', silent_result=True, scopes=ReportsPermission.UPDATE_INTEGRATIONS)
@@ -42,7 +42,7 @@ def api_get_settings(sik):
 @arguments(sik=unicode, data=IntegrationTO)
 def api_save_settings(sik, data):
     # type: (str, IntegrationTO) -> IntegrationTO
-    return IntegrationTO.from_model(save_integration_settings(sik, data.name, data.data))
+    return IntegrationTO.from_model(*save_integration_settings(sik, data.rogerthat_api_key, data.name, data.data))
 
 
 @rest('/topdesk-data', 'post', silent_result=True)
