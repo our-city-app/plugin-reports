@@ -27,6 +27,7 @@ from plugins.reports.to import GetMapItemsResponseTO, GetMapItemDetailsResponseT
 def convert_filter_to_status(filter_value):
     mapping = {
         # ReportsFilter is defined in rogerthat.bizz.maps.reports.ReportsFilter
+        ReportsFilter.ALL: None,
         ReportsFilter.NEW: IncidentStatus.NEW,
         ReportsFilter.IN_PROGRESS: IncidentStatus.IN_PROGRESS,
         ReportsFilter.RESOLVED: IncidentStatus.RESOLVED,

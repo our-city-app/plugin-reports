@@ -31,41 +31,40 @@ from plugins.reports.dal import get_incident, get_rogerthat_user
 from plugins.reports.models import RogerthatUser, Incident, IncidentDetails, ThreePSettings, IntegrationSettings, \
     IncidentStatus, IncidentParamsFlow
 from plugins.rogerthat_api.to import MemberTO
+from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO
+from typing import Tuple
 
 
 def create_incident(settings, rt_user, incident, steps):
-    # type: (IntegrationSettings, RogerthatUser, Incident, list) -> [bool, dict, None]
-    xml_content, details = create_incident_xml(incident, rt_user, steps)
+    # type: (IntegrationSettings, RogerthatUser, Incident, list) -> None
+    xml_content, details, visible = create_incident_xml(incident, rt_user, steps)
     if DEBUG:
-        logging.debug(xml_content)
+        logging.debug('3P incident XML: %s', xml_content)
+    incident.details = details
+    incident.visible = all((details.title, details.description, details.geo_location, visible))
     data = settings.data  # type: ThreePSettings
     deferred.defer(create_incident_on_gcs, data.gcs_bucket_name, incident.incident_id, xml_content,
                    _queue=INCIDENTS_QUEUE)
 
-    incident.details = details
-    if details.title and details.description and details.geo_location:
-        incident.visible = True
-    else:
-        incident.visible = False
-
 
 def create_incident_xml(incident, rt_user, steps):
-    # type: (Incident, RogerthatUser, list) -> [str, IncidentDetails]
+    # type: (Incident, RogerthatUser, list) -> Tuple[str, IncidentDetails, bool]
     attachments = []
     result_text = []
     incident_type = None
     description = []
     place = None
 
-    requestor = dict(email=rt_user.email)
+    requestor = {'email': rt_user.email}
     latitude = None
     longitude = None
+    visible = False
     for step in steps:
         if step.step_id == 'message_keuze':
             incident_type = step.button
             continue
 
-        if step.step_type == "form_step":
+        if isinstance(step, FormFlowStepTO):
             if step.answer_id == "positive":
                 if step.step_id == 'message_description':
                     description.append(step.get_value())
@@ -103,17 +102,21 @@ def create_incident_xml(incident, rt_user, steps):
                 if step.step_id == 'message_my-address':
                     requestor['street'] = step.get_value()
                     continue
-
                 step_value = step.display_value
             else:
                 step_value = None
-        else:
-            if step.step_type == "message_step":
-                step_value = step.button
-                if step_value == None:
-                    step_value = "Rogerthat"
+        elif isinstance(step, MessageFlowStepTO):
+            if step.step_id == 'message_consent':
+                if step.answer_id == 'button_yes':
+                    visible = True
+                continue
+            step_value = step.button
+            if step_value is None:
+                step_value = 'Ok'
             else:
                 step_value = step.button
+        else:
+            step_value = None
 
         if step_value:
             result_text.append(step.message)
@@ -147,7 +150,7 @@ def create_incident_xml(incident, rt_user, steps):
     if latitude and longitude:
         details.geo_location = ndb.GeoPt(latitude, longitude)
     # Remove encoding since 3p can't process it
-    return prettyxml.replace('<?xml version="1.0" encoding="utf8"?>', '<?xml version="1.0"?>'), details
+    return prettyxml.replace('<?xml version="1.0" encoding="utf8"?>', '<?xml version="1.0"?>'), details, visible
 
 
 def create_incident_on_gcs(gcs_bucket_name, incident_id, xml_content, attempt=1):

@@ -40,7 +40,7 @@ from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO, FlowStepTO
 from plugins.rogerthat_api.to.messaging.forms import Widget, FormTO, OpenIdWidgetResultTO, LocationWidgetResultTO
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, Widget.TYPE_DATE_SELECT,
                           Widget.TYPE_RANGE_SLIDER)
@@ -103,7 +103,7 @@ def create_incident(config, rt_user, incident, steps):
         data['callerLookup'] = {
             'id': rt_user.external_id
         }
-    custom_values, included_step_ids = get_field_mapping_values(settings, steps)
+    custom_values, included_step_ids, visible = get_field_mapping_values(settings, steps)
     logging.info('Updating request data with %s', custom_values)
     data.update(custom_values)
     result_text = []  # list of lines of markdown
@@ -173,8 +173,7 @@ def create_incident(config, rt_user, incident, steps):
         count += 1
         deferred.defer(upload_attachment, config.sik, response['id'], url, 'foto-%s.jpg' % count)
 
-    # TODO shouldn't be visible if user didn't consent for this
-    visible = all((incident_details.title, incident_details.description, incident_details.geo_location))
+    visible = all((incident_details.title, incident_details.description, incident_details.geo_location, visible))
     incident.visible = visible
     incident.details = incident_details
     integration_params = IntegrationParamsTopdesk()
@@ -184,7 +183,9 @@ def create_incident(config, rt_user, incident, steps):
 
 
 def get_field_mapping_values(settings, steps):
+    # type: (TopdeskSettings, List[FlowStepTO]) -> Tuple[Dict[str, str], List[str], bool]
     # Maps form step values to fields for a topdesk incident
+    has_consent = False
     custom_values = defaultdict(dict)
     included_step_ids = set()
     for mapping in settings.field_mapping:
@@ -228,9 +229,12 @@ def get_field_mapping_values(settings, steps):
                     custom_values[mapping.property]['id'] = value_id
                     included_step_ids.add(step.step_id)
         elif isinstance(step, MessageFlowStepTO):
-            custom_values[mapping.property]['id'] = step.answer_id.lstrip('button_')
+            if mapping.type == TopdeskFieldMappingType.PUBLIC_CONSENT:
+                has_consent = step.answer_id == mapping.property
+            else:
+                custom_values[mapping.property]['id'] = step.answer_id.lstrip('button_')
             included_step_ids.add(step.step_id)
-    return custom_values, included_step_ids
+    return custom_values, included_step_ids, has_consent
 
 
 def reverse_geocode_location(result):

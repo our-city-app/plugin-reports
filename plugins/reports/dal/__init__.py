@@ -51,6 +51,13 @@ def list_integrations():
 
 
 def get_integration_settings(sik):
+    settings = IntegrationSettings.create_key(sik).get()
+    if not settings:
+        raise HttpNotFoundException('settings_not_found', {'sik': sik})
+    return settings
+
+
+def get_integration_settings_tuple(sik):
     # type: (str) -> Tuple[IntegrationSettings, RogerthatSettings]
     settings, rt_settings = ndb.get_multi([IntegrationSettings.create_key(sik), RogerthatSettings.create_key(sik)])
     if not settings:

@@ -24,6 +24,7 @@ class TopdeskFieldMappingType(Enum):
     GPS_URL = 3
     FIXED_VALUE = 4
     REVERSE_MAPPING = 5
+    PUBLIC_CONSENT = 6  # consent that incident can be made public
 
 
 class TopdeskPropertyName(Enum):

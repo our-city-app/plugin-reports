@@ -27,7 +27,7 @@ from google.appengine.ext import ndb
 from mcfw.consts import DEBUG
 from plugins.reports.bizz import convert_to_item_to
 from plugins.reports.models import ElasticsearchSettings, Incident
-from typing import Generator, Dict, Iterable, List, Tuple
+from typing import Generator, Dict, Iterable, List, Tuple, Union
 
 
 def get_elasticsearch_config():
@@ -53,7 +53,10 @@ def _request(path, method=urlfetch.GET, payload=None, allowed_status_codes=(200,
     data = json.dumps(payload) if isinstance(payload, dict) else payload
     url = config.base_url + path
     if DEBUG:
-        logging.debug(url)
+        if data:
+            logging.debug('%s\n%s', url, data)
+        else:
+            logging.debug(url)
     result = urlfetch.fetch(url, data, method, headers, deadline=30)  # type: urlfetch._URLFetchResult
     if result.status_code not in allowed_status_codes:
         logging.debug(result.content)
@@ -146,10 +149,10 @@ def re_index_incidents(incidents):
 
 def search_current(lat, lon, distance, status, cursor=None, limit=10):
     start_time = time.time()
-    new_cursor, result_data = _search(lat, lon, distance, status, cursor, limit)
+    new_cursor, result_ids = _search(lat, lon, distance, status, cursor, limit)
     took_time = time.time() - start_time
     logging.info('debugging.search_current _search {0:.3f}s'.format(took_time))
-    keys = {Incident.create_key(hit['_id']) for hit in result_data['hits']['hits']}
+    keys = {Incident.create_key(id_) for id_ in result_ids}
 
     if keys:
         start_time = time.time()
@@ -168,15 +171,16 @@ def search_current(lat, lon, distance, status, cursor=None, limit=10):
 
 
 def _search(lat, lon, distance, status, cursor, limit):
+    # type: (float, float, int, str, str, int) -> Tuple[Union[None, str], List[str]]
     # we can only fetch up to 10000 items with from param
     start_offset = long(cursor) if cursor else 0
 
     if (start_offset + limit) > 10000:
         limit = 10000 - start_offset
     if limit <= 0:
-        return {'cursor': None, 'ids': []}
+        return None, []
 
-    d = {
+    qry = {
         'size': limit,
         'from': start_offset,
         'query': {
@@ -192,10 +196,6 @@ def _search(lat, lon, distance, status, cursor, limit):
                             'lon': lon
                         }
                     }
-                }, {
-                    'term': {
-                        'status': status
-                    }
                 }]
             }
         },
@@ -210,8 +210,14 @@ def _search(lat, lon, distance, status, cursor, limit):
             }
         }]
     }
+    if status:
+        qry['query']['bool']['filter'].append({
+            'term': {
+                'status': status
+            }
+        })
     path = '/%s/_search' % get_reports_index()
-    result_data = _request(path, urlfetch.POST, d)
+    result_data = _request(path, urlfetch.POST, qry)
 
     new_cursor = None
     next_offset = start_offset + len(result_data['hits']['hits'])
@@ -219,4 +225,4 @@ def _search(lat, lon, distance, status, cursor, limit):
         if result_data['hits']['total']['value'] > next_offset and next_offset < 10000:
             new_cursor = u'%s' % next_offset
 
-    return new_cursor, result_data
+    return new_cursor, [hit['_id'] for hit in result_data['hits']['hits']]

@@ -17,7 +17,7 @@
 
 from mcfw.restapi import rest
 from mcfw.rpc import returns, arguments
-from plugins.reports.dal import list_integrations, get_integration_settings, save_integration_settings
+from plugins.reports.dal import list_integrations, save_integration_settings, get_integration_settings_tuple
 from plugins.reports.integrations.int_topdesk.topdesk import get_topdesk_data
 from plugins.reports.integrations.to import IntegrationTO
 from plugins.reports.permissions import ReportsPermission
@@ -34,7 +34,7 @@ def api_list_settings():
 @returns(IntegrationTO)
 @arguments(sik=unicode)
 def api_get_settings(sik):
-    return IntegrationTO.from_model(*get_integration_settings(sik))
+    return IntegrationTO.from_model(*get_integration_settings_tuple(sik))
 
 
 @rest('/integrations/<sik:[^/]+>', 'put', silent_result=True, scopes=ReportsPermission.UPDATE_INTEGRATIONS)

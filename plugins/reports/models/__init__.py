@@ -209,6 +209,7 @@ class IncidentStatus(Enum):
 
 
 class ReportsFilter(Enum):
+    ALL = 'all'
     NEW = 'reported'
     IN_PROGRESS = 'in_progress'
     RESOLVED = 'resolved'
