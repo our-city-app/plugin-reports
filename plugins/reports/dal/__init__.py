@@ -18,8 +18,10 @@ from google.appengine.ext import ndb
 
 from mcfw.consts import MISSING
 from mcfw.exceptions import HttpNotFoundException
+from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident, \
     TopdeskSettings
+from plugins.reports.to import IncidentTO
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 from plugins.rogerthat_api.to import UserDetailsTO
 from typing import List, Tuple
@@ -100,3 +102,13 @@ def get_incident(incident_id):
 def get_incident_by_external_id(sik, external_id):
     # type: (str, str) -> Incident
     return Incident.get_by_external_id(sik, external_id)
+
+
+def update_incident(incident, data):
+    # type: (Incident, IncidentTO) -> Incident
+    if incident.details.status != data.details.status:
+        incident.set_status(data.details.status)
+    incident.visible = data.visible if incident.can_show_on_map else False
+    incident.put()
+    re_index_incident(incident)
+    return incident

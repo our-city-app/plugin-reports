@@ -27,6 +27,7 @@
     "provider": "Provider",
     "resolved": "Resolved",
     "rogerthat_api_key": "Rogerthat api key",
+    "secret": "Secret",
     "service_identity_key": "Service identity key",
     "settings": "Settings",
     "sub_category": "Subcategory",

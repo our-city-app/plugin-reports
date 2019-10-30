@@ -3,3 +3,8 @@ indexes:
     properties:
       - name: sik
       - name: external_id
+  - kind: Incident
+    properties:
+      - name: sik
+      - name: report_date
+        direction: desc

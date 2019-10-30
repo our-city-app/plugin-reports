@@ -112,7 +112,7 @@ def create_index():
     return _request(path, urlfetch.PUT, request)
 
 
-def index_incident(incident):
+def _index_incident(incident):
     # type: (Incident) -> Generator[Dict]
     if incident.visible:
         doc = {
@@ -122,9 +122,9 @@ def index_incident(incident):
             },
             'status': incident.details.status
         }
-        return index_doc_operations(incident.incident_id, doc)
+        return index_doc_operations(incident.id, doc)
     else:
-        return delete_doc_operations(incident.incident_id)
+        return delete_doc_operations(incident.id)
 
 
 def delete_doc_operations(uid):
@@ -138,12 +138,12 @@ def index_doc_operations(uid, doc):
 
 def re_index_incident(incident):
     # type: (Incident) -> List[Dict]
-    return execute_bulk_request(index_incident(incident))
+    return execute_bulk_request(_index_incident(incident))
 
 
 def re_index_incidents(incidents):
     # type: (List[Incident]) -> List[Dict]
-    operations = itertools.chain.from_iterable([index_incident(incident) for incident in incidents])
+    operations = itertools.chain.from_iterable([_index_incident(incident) for incident in incidents])
     return execute_bulk_request(operations)
 
 

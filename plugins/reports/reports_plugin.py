@@ -24,7 +24,8 @@ from mcfw.restapi import rest_functions
 from mcfw.rpc import parse_complex_value
 from plugins.basic_auth.basic_auth_plugin import get_basic_auth_plugin
 from plugins.basic_auth.permissions import APP_ADMIN_GROUP_ID, BARole
-from plugins.reports import rogerthat_callbacks, map_api
+from plugins.reports import rogerthat_callbacks
+from plugins.reports.api import map_api, reports
 from plugins.reports.bizz.rtemail import EmailHandler
 from plugins.reports.handlers.cron import ReportsCleanupTimedOutHandler
 from plugins.reports.integrations import integrations_api
@@ -50,8 +51,9 @@ class ReportsPlugin(Plugin):
     def get_handlers(self, auth):
         if auth == Handler.AUTH_UNAUTHENTICATED:
             yield Handler(url='/plugins/reports/topdesk/callback_api', handler=TopdeskCallbackHandler)
-            for url, handler in rest_functions(map_api, authentication=NOT_AUTHENTICATED):
-                yield Handler(url=url, handler=handler)
+            for mod in [map_api, reports]:
+                for url, handler in rest_functions(mod, authentication=NOT_AUTHENTICATED):
+                    yield Handler(url=url, handler=handler)
             for url, handler in rest_functions(integrations_api, authentication=NOT_AUTHENTICATED):
                 yield Handler(url=url, handler=handler)
         if auth == Handler.AUTH_ADMIN:

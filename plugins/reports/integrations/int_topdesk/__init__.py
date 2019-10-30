@@ -103,7 +103,7 @@ def create_incident(config, rt_user, incident, steps):
         data['callerLookup'] = {
             'id': rt_user.external_id
         }
-    custom_values, included_step_ids, visible = get_field_mapping_values(settings, steps)
+    custom_values, included_step_ids, user_consent = get_field_mapping_values(settings, steps)
     logging.info('Updating request data with %s', custom_values)
     data.update(custom_values)
     result_text = []  # list of lines of markdown
@@ -173,13 +173,14 @@ def create_incident(config, rt_user, incident, steps):
         count += 1
         deferred.defer(upload_attachment, config.sik, response['id'], url, 'foto-%s.jpg' % count)
 
-    visible = all((incident_details.title, incident_details.description, incident_details.geo_location, visible))
-    incident.visible = visible
     incident.details = incident_details
     integration_params = IntegrationParamsTopdesk()
     integration_params.status = IdName.from_dict(response['processingStatus'])
+    integration_params.id = response['id']
     incident.integration_params = integration_params
-    incident.external_id = response['id']
+    incident.external_id = response['number']  # e.g. M 1602 341
+    incident.user_consent = user_consent
+    incident.visible = incident.can_show_on_map
 
 
 def get_field_mapping_values(settings, steps):
@@ -296,9 +297,9 @@ def incident_feedback(sik, incident_id, message):
     params = incident.integration_params  # type: IntegrationParamsTopdesk
     updated = True
     if response['closed']:
-        incident.details.status = IncidentStatus.RESOLVED
+        incident.set_status(IncidentStatus.RESOLVED)
     elif incident.details.status == IncidentStatus.NEW:
-        incident.details.status = IncidentStatus.IN_PROGRESS
+        incident.set_status(IncidentStatus.IN_PROGRESS)
     else:
         updated = False
     message_lines = ['Uw melding is geüpdatet.']

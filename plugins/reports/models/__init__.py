@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from datetime import datetime
 
 from google.appengine.ext import ndb
 
@@ -126,6 +127,7 @@ class IdName(TO):
 class IntegrationParamsTopdesk(TO):
     t = unicode_property('t', default=IntegrationProvider.TOPDESK)
     status = typed_property('status', IdName)  # type: IdName
+    id = unicode_property('id')  # id of the incident 7b300346-fb2a-4577-af62-b413ad65a0d1
     last_message = unicode_property('last_message')  # last message sent by operator
 
 
@@ -215,15 +217,16 @@ class ReportsFilter(Enum):
     RESOLVED = 'resolved'
 
 
-class IncidentSource(Enum):
-    APP = 'app'
-
-
 class IncidentDetails(NdbModel):
     status = ndb.StringProperty(indexed=False, choices=IncidentStatus.all())
     title = ndb.StringProperty(indexed=False)
     description = ndb.TextProperty(indexed=False)
     geo_location = ndb.GeoPtProperty(indexed=False)
+
+
+class IncidentStatusDate(NdbModel):
+    date = ndb.DateTimeProperty()
+    status = ndb.StringProperty(choices=IncidentStatus.all())
 
 
 class Incident(NdbModel):
@@ -232,21 +235,27 @@ class Incident(NdbModel):
     sik = ndb.StringProperty()
     user_id = ndb.StringProperty()
     report_date = ndb.DateTimeProperty()
-    resolve_time = ndb.DateTimeProperty()
+    status_dates = ndb.StructuredProperty(IncidentStatusDate, repeated=True)
 
+    # If user has given consent for this incident to be public
+    user_consent = ndb.BooleanProperty(indexed=False, default=False)
     visible = ndb.BooleanProperty(default=False)
     cleanup_date = ndb.DateTimeProperty()
 
     integration = ndb.StringProperty(indexed=False)
-    source = ndb.StringProperty(choices=IncidentSource.all())
+    source = ndb.StringProperty(choices=['app'])
     params = TOProperty(IncidentParams())  # type: IncidentParams
     integration_params = TOProperty(IntegrationParams())  # type: IntegrationParams
     external_id = ndb.StringProperty()
     details = ndb.LocalStructuredProperty(IncidentDetails)  # type: IncidentDetails
 
     @property
-    def incident_id(self):
-        return self.key.id()
+    def id(self):
+        return self.key.id().decode('utf-8')
+
+    @property
+    def can_show_on_map(self):
+        return all((self.user_consent, self.details.title, self.details.description, self.details.geo_location))
 
     @classmethod
     def create_key(cls, incident_id):
@@ -265,6 +274,14 @@ class Incident(NdbModel):
             .filter(cls.cleanup_date != None) \
             .filter(cls.cleanup_date < date) \
             .order(cls.cleanup_date, cls.key)
+
+    @classmethod
+    def list_by_sik(cls, sik):
+        return cls.query().filter(cls.sik == sik).order(-cls.report_date)
+
+    def set_status(self, status):
+        self.details.status = status
+        self.status_dates.append(IncidentStatusDate(date=datetime.now(), status=status))
 
 
 class IncidentVote(NdbModel):

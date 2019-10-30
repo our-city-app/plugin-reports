@@ -53,8 +53,8 @@ def get_reports_map_item_details(ids, user_id, language):
     if not ids or not user_id:
         return GetMapItemDetailsResponseTO()
     incidents = ndb.get_multi([Incident.create_key(uid) for uid in ids])
-    extra_keys = [IncidentVote.create_key(incident.incident_id) for incident in incidents] + \
-                 [UserIncidentVote.create_key(user_id, incident.incident_id) for incident in incidents]
+    extra_keys = [IncidentVote.create_key(incident.id) for incident in incidents] + \
+                 [UserIncidentVote.create_key(user_id, incident.id) for incident in incidents]
     extra_models = ndb.get_multi(extra_keys)
     count = len(incidents)
     votes = extra_models[:count]

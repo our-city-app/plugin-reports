@@ -29,7 +29,7 @@ from plugins.reports.integrations.int_3p import create_incident as create_3p_inc
 from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
 from plugins.reports.models import Incident, IntegrationProvider, IncidentSource, IncidentParamsFlow
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
-from typing import List
+from typing import List, Tuple
 
 
 def cleanup_timed_out():
@@ -75,7 +75,7 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
     incident.report_date = datetime.utcfromtimestamp(timestamp)
     incident.cleanup_date = None
     incident.integration = settings.integration
-    incident.source = IncidentSource.APP
+    incident.source = 'app'
     params = IncidentParamsFlow()
     params.parent_message_key = parent_message_key
     params.steps = parsed_steps
@@ -89,3 +89,8 @@ def _create_incident(incident_id, sik, user_id, parent_message_key, timestamp, s
         raise Exception('Unknown integration: %s' % settings.integration)
     incident.put()
     try_or_defer(re_index_incident, incident)
+
+
+def list_incidents(sik, page_size, cursor=None):
+    # type: (str, int, str) -> Tuple[List[Incident], ndb.Cursor, bool]
+    return Incident.list_by_sik(sik).fetch_page(page_size, start_cursor=cursor)

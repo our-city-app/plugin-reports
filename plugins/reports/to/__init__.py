@@ -14,10 +14,13 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from __future__ import unicode_literals
 
 from framework.to import TO
 from mcfw.properties import unicode_property, float_property, typed_property, \
     long_property, object_factory, bool_property
+from plugins.reports.models import IncidentParams, IntegrationParams, Incident
+from plugins.rogerthat_api.to import PaginatedResultTO
 
 
 class ReportsPluginConfiguration(TO):
@@ -170,3 +173,34 @@ class ItemVoteTO(TO):
     user_id = unicode_property('user_id', default=None)
     vote_id = unicode_property('vote_id', default=None)
     option_id = unicode_property('option_id', default=None)
+
+
+class LatLonTO(TO):
+    lat = float_property('lat')
+    lon = float_property('lon')
+
+
+class IncidentDetailsTO(TO):
+    status = unicode_property('status')
+    title = unicode_property('title')
+    description = unicode_property('description')
+    geo_location = typed_property('geo_location', LatLonTO)
+
+
+class IncidentTO(TO):
+    id = unicode_property('id')
+    user_id = unicode_property('user_id')
+    report_date = unicode_property('report_date')
+    status_dates = typed_property('status_dates', dict, True)
+    user_consent = bool_property('user_consent')
+    visible = bool_property('visible')
+    integration = unicode_property('integration')
+    source = unicode_property('source')
+    # params = typed_property('params', IncidentParams())
+    # integration_params = typed_property('incident_params', IntegrationParams())
+    external_id = unicode_property('external_id')
+    details = typed_property('details', IncidentDetailsTO)  # type: IncidentDetailsTO
+
+
+class IncidentListTO(PaginatedResultTO):
+    results = typed_property('results', IncidentTO, True)

@@ -37,13 +37,14 @@ from typing import Tuple
 
 def create_incident(settings, rt_user, incident, steps):
     # type: (IntegrationSettings, RogerthatUser, Incident, list) -> None
-    xml_content, details, visible = create_incident_xml(incident, rt_user, steps)
+    xml_content, details, user_consent = create_incident_xml(incident, rt_user, steps)
     if DEBUG:
         logging.debug('3P incident XML: %s', xml_content)
     incident.details = details
-    incident.visible = all((details.title, details.description, details.geo_location, visible))
-    data = settings.data  # type: ThreePSettings
-    deferred.defer(create_incident_on_gcs, data.gcs_bucket_name, incident.incident_id, xml_content,
+    incident.user_consent = user_consent
+    incident.visible = incident.can_show_on_map
+    config = settings.data  # type: ThreePSettings
+    deferred.defer(create_incident_on_gcs, config.gcs_bucket_name, incident.id, xml_content,
                    _queue=INCIDENTS_QUEUE)
 
 
@@ -58,7 +59,7 @@ def create_incident_xml(incident, rt_user, steps):
     requestor = {'email': rt_user.email}
     latitude = None
     longitude = None
-    visible = False
+    user_consent = False
     for step in steps:
         if step.step_id == 'message_keuze':
             incident_type = step.button
@@ -108,7 +109,7 @@ def create_incident_xml(incident, rt_user, steps):
         elif isinstance(step, MessageFlowStepTO):
             if step.step_id == 'message_consent':
                 if step.answer_id == 'button_yes':
-                    visible = True
+                    user_consent = True
                 continue
             step_value = step.button
             if step_value is None:
@@ -123,7 +124,7 @@ def create_incident_xml(incident, rt_user, steps):
             result_text.append(step_value)
 
     result_text.append(u'\nJe kan deze melding beantwoorden door een e-mail te sturen naar:'
-                       u'\nincident.%s.followup@%s.appspotmail.com' % (incident.incident_id,
+                       u'\nincident.%s.followup@%s.appspotmail.com' % (incident.id,
                                                                        app_identity.get_application_id()))
 
     comment = '\r\n'.join(result_text)
@@ -138,7 +139,7 @@ def create_incident_xml(incident, rt_user, steps):
         u'longitude': longitude,
         u'requestor': requestor,
         u'contactmethod': u'app',
-        u'externId': incident.incident_id,
+        u'externId': incident.id,
         u'attachments': attachments
 
     }
@@ -150,7 +151,7 @@ def create_incident_xml(incident, rt_user, steps):
     if latitude and longitude:
         details.geo_location = ndb.GeoPt(latitude, longitude)
     # Remove encoding since 3p can't process it
-    return prettyxml.replace('<?xml version="1.0" encoding="utf8"?>', '<?xml version="1.0"?>'), details, visible
+    return prettyxml.replace('<?xml version="1.0" encoding="utf8"?>', '<?xml version="1.0"?>'), details, user_consent
 
 
 def create_incident_on_gcs(gcs_bucket_name, incident_id, xml_content, attempt=1):
@@ -174,7 +175,7 @@ def incident_follow_up(from_, regex, subject, body):
     rt_user = get_rogerthat_user(incident.user_id)
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
     if incident.details.status == IncidentStatus.NEW:
-        incident.details.status = IncidentStatus.IN_PROGRESS
+        incident.set_status(IncidentStatus.IN_PROGRESS)
         incident.put()
         try_or_defer(re_index_incident, incident)
     if isinstance(incident.params, IncidentParamsFlow):

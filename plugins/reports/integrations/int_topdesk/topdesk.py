@@ -135,7 +135,7 @@ def topdesk_api_call(settings, path, method=urlfetch.GET, payload=None):
         should_raise = True
 
     if should_raise:
-        logging.info('Headers: %s', headers)
+        logging.info('%s\nHeaders: %s', full_url, headers)
         if response.content:
             logging.info('Content: %s', response.content)
         if payload:

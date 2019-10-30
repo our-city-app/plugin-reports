@@ -81,7 +81,7 @@ def convert_to_item_to(m):
     icon_id = 'other'
     icon_color = '#263583'
 
-    return MapItemTO(id=m.incident_id,
+    return MapItemTO(id=m.id,
                      coords=GeoPointTO(lat=m.details.geo_location.lat,
                                        lon=m.details.geo_location.lon),
                      icon=MapIconTO(id=icon_id,
@@ -92,7 +92,7 @@ def convert_to_item_to(m):
 
 def convert_to_item_details_to(incident, vote, user_vote, language):
     # type: (Incident, IncidentVote, UserIncidentVote, unicode) -> MapItemDetailsTO
-    return MapItemDetailsTO(id=incident.incident_id,
+    return MapItemDetailsTO(id=incident.id,
                             geometry=[],
                             sections=[
                                 TextSectionTO(title=incident.details.title,
