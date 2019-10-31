@@ -78,6 +78,7 @@ def get_vote_options(vote, user_vote, language):
 
 def convert_to_item_to(m):
     # type: (Incident) -> MapItemTO
+    # TODO: proper icon
     icon_id = 'other'
     icon_color = '#263583'
 
@@ -92,11 +93,12 @@ def convert_to_item_to(m):
 
 def convert_to_item_details_to(incident, vote, user_vote, language):
     # type: (Incident, IncidentVote, UserIncidentVote, unicode) -> MapItemDetailsTO
-    return MapItemDetailsTO(id=incident.id,
+    item = MapItemDetailsTO(id=incident.id,
                             geometry=[],
                             sections=[
                                 TextSectionTO(title=incident.details.title,
                                               description=incident.details.description),
-                                VoteSectionTO(id=u'vote1',
-                                              options=get_vote_options(vote, user_vote, language))
                             ])
+    if vote:
+        item.sections.append(VoteSectionTO(id=u'vote1', options=get_vote_options(vote, user_vote, language)))
+    return item

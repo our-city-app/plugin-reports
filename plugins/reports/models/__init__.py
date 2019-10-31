@@ -23,6 +23,7 @@ from framework.to import TO
 from mcfw.properties import unicode_property, object_factory, unicode_list_property, long_property, bool_property, \
     typed_property
 from plugins.reports.consts import NAMESPACE
+from plugins.reports.models.green_valley import GreenValleyFormConfiguration
 from plugins.rogerthat_api.plugin_utils import Enum
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
 
@@ -43,6 +44,7 @@ class ElasticsearchSettings(NdbModel):
 class IntegrationProvider(Enum):
     TOPDESK = u'topdesk'
     THREE_P = u'3p'
+    GREEN_VALLEY = u'green_valley'
 
 
 class TopdeskfieldMapping(TO):
@@ -73,7 +75,6 @@ class TopdeskSettings(TO):
     branch_id = unicode_property('branch_id')
     unregistered_users = bool_property('unregistered_users')
     field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)
-    consumer = unicode_property('consumer')
 
 
 class ThreePSettings(TO):
@@ -81,9 +82,17 @@ class ThreePSettings(TO):
     gcs_bucket_name = unicode_property('gcs_bucket_name')
 
 
+class GreenValleySettings(TO):
+    provider = unicode_property('provider', default=IntegrationProvider.GREEN_VALLEY)
+    username = unicode_property('username')
+    password = unicode_property('password')
+    base_url = unicode_property('base_url')
+
+
 INTEGRATION_SETTINGS_MAPPING = {
     IntegrationProvider.TOPDESK: TopdeskSettings,
     IntegrationProvider.THREE_P: ThreePSettings,
+    IntegrationProvider.GREEN_VALLEY: GreenValleySettings,
 }
 
 
@@ -99,6 +108,7 @@ INTEGRATION_SETTINGS_DATA = IntegrationSettingsData()
 
 class IncidentSource(object_factory):
     FLOW = 1
+    FORM = 2
 
 
 class IncidentParamsFlow(TO):
@@ -107,8 +117,14 @@ class IncidentParamsFlow(TO):
     steps = typed_property('steps', FLOW_STEP_TO, True)
 
 
+class IncidentParamsForm(TO):
+    t = long_property('t', default=IncidentSource.FORM)
+    submission_id = long_property('submission_id')
+
+
 INCIDENT_PARAMS_MAPPING = {
     IncidentSource.FLOW: IncidentParamsFlow,
+    IncidentSource.FORM: IncidentParamsForm,
 }
 
 
@@ -143,23 +159,34 @@ class IntegrationParams(object_factory):
         super(IntegrationParams, self).__init__('t', INTEGRATION_PARAMS_MAPPING)
 
 
+FORM_INTEGRATION_CONFIG_MAPPING = {
+    IntegrationProvider.GREEN_VALLEY: GreenValleyFormConfiguration
+}
+
+
+class FormIntegrationConfig(object_factory):
+    provider = unicode_property('provider')
+
+    def __init__(self):
+        super(FormIntegrationConfig, self).__init__('provider', FORM_INTEGRATION_CONFIG_MAPPING)
+
+
 class IntegrationSettings(NdbModel):
     NAMESPACE = NAMESPACE
 
     integration = ndb.StringProperty(indexed=False)
     name = ndb.StringProperty()
+    consumer_id = ndb.StringProperty()
+    sik = ndb.StringProperty()
     data = TOProperty(INTEGRATION_SETTINGS_DATA)
 
     @property
-    def sik(self):
-        return self.key.id().decode('utf8')
-
-    def to_dict(self, extra_properties=None, include=None, exclude=None):
-        return super(IntegrationSettings, self).to_dict(extra_properties=extra_properties or ['sik'])
+    def id(self):
+        return self.key.id()
 
     @classmethod
-    def create_key(cls, sik):
-        return ndb.Key(cls, sik, namespace=NAMESPACE)
+    def create_key(cls, integration_id):
+        return ndb.Key(cls, integration_id, namespace=NAMESPACE)
 
     @classmethod
     def list(cls):
@@ -170,7 +197,7 @@ class Consumer(NdbModel):
     NAMESPACE = NAMESPACE
 
     ref = ndb.StringProperty(indexed=False)
-    sik = ndb.StringProperty(indexed=False)
+    integration_id = ndb.IntegerProperty()
 
     @property
     def consumer_key(self):
@@ -232,7 +259,6 @@ class IncidentStatusDate(NdbModel):
 class Incident(NdbModel):
     NAMESPACE = NAMESPACE
 
-    sik = ndb.StringProperty()
     user_id = ndb.StringProperty()
     report_date = ndb.DateTimeProperty()
     status_dates = ndb.StructuredProperty(IncidentStatusDate, repeated=True)
@@ -242,7 +268,7 @@ class Incident(NdbModel):
     visible = ndb.BooleanProperty(default=False)
     cleanup_date = ndb.DateTimeProperty()
 
-    integration = ndb.StringProperty(indexed=False)
+    integration_id = ndb.IntegerProperty()
     source = ndb.StringProperty(choices=['app'])
     params = TOProperty(IncidentParams())  # type: IncidentParams
     integration_params = TOProperty(IntegrationParams())  # type: IntegrationParams
@@ -257,14 +283,18 @@ class Incident(NdbModel):
     def can_show_on_map(self):
         return all((self.user_consent, self.details.title, self.details.description, self.details.geo_location))
 
+    @property
+    def can_show_votes(self):
+        return self.details.status in (IncidentStatus.NEW, IncidentStatus.IN_PROGRESS)
+
     @classmethod
     def create_key(cls, incident_id):
         return ndb.Key(cls, incident_id, namespace=cls.NAMESPACE)
 
     @classmethod
-    def get_by_external_id(cls, sik, external_id):
+    def get_by_external_id(cls, integration_id, external_id):
         return cls.query() \
-            .filter(cls.sik == sik) \
+            .filter(cls.integration_id == integration_id) \
             .filter(cls.external_id == external_id) \
             .get()
 
@@ -276,12 +306,26 @@ class Incident(NdbModel):
             .order(cls.cleanup_date, cls.key)
 
     @classmethod
-    def list_by_sik(cls, sik):
-        return cls.query().filter(cls.sik == sik).order(-cls.report_date)
+    def list_by_integration_id(cls, integration_id):
+        return cls.query().filter(cls.integration_id == integration_id).order(-cls.report_date)
 
     def set_status(self, status):
         self.details.status = status
         self.status_dates.append(IncidentStatusDate(date=datetime.now(), status=status))
+
+
+class FormIntegration(NdbModel):
+    integration_id = ndb.IntegerProperty()  # IntegrationSettings id
+    config = TOProperty(FormIntegrationConfig())
+
+    @classmethod
+    def create_key(cls, form_id):
+        return ndb.Key(cls, form_id)
+
+
+class SaveFormIntegrationTO(TO):
+    form_id = long_property('form_id')
+    config = typed_property('config', FormIntegrationConfig())
 
 
 class IncidentVote(NdbModel):

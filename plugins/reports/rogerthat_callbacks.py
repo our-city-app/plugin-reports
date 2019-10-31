@@ -19,6 +19,7 @@ import logging
 
 from mcfw.rpc import parse_complex_value, serialize_complex_value
 from plugins.reports.bizz.incidents import process_incident
+from plugins.reports.dal import get_consumer
 from plugins.reports.utils import parse_to_human_readable_tag
 from plugins.rogerthat_api.to import UserDetailsTO
 from plugins.rogerthat_api.to.messaging.service_callback_results import FlowMemberResultCallbackResultTO
@@ -42,7 +43,8 @@ def flow_member_result(rt_settings, request_id, tag, parent_message_key, steps, 
     f = FMR_TAG_MAPPING.get(parse_to_human_readable_tag(tag))
     if f:
         logging.info('Processing flow_member_result with tag %s and flush_id %s', tag, flush_id)
-        result = f(rt_settings.sik, user_details, parent_message_key, steps, timestamp)
+        consumer = get_consumer(rt_settings.sik)
+        result = f(consumer.integration_id, user_details, parent_message_key, steps, timestamp)
         return result and serialize_complex_value(result, FlowMemberResultCallbackResultTO, False,
                                                   skip_missing=True)
     return None

@@ -8,6 +8,9 @@ export const enum ReportsActionTypes {
   GET_SETTINGS = '[Reports] get settings',
   GET_SETTINGS_COMPLETE = '[Reports] get settings complete',
   GET_SETTINGS_FAILED = '[Reports] get settings failed',
+  CREATE_SETTINGS = '[Reports] create settings',
+  CREATE_SETTINGS_COMPLETE = '[Reports] create settings complete',
+  CREATE_SETTINGS_FAILED = '[Reports] create settings failed',
   UPDATE_SETTINGS = '[Reports] update settings',
   UPDATE_SETTINGS_COMPLETE = '[Reports] update settings complete',
   UPDATE_SETTINGS_FAILED = '[Reports] update settings failed',
@@ -37,7 +40,7 @@ export class ListSettingsFailedAction implements Action {
 export class GetSettingsAction implements Action {
   readonly type = ReportsActionTypes.GET_SETTINGS;
 
-  constructor(public sik: string) {
+  constructor(public payload: { id: number }) {
   }
 }
 
@@ -50,6 +53,27 @@ export class GetSettingsCompleteAction implements Action {
 
 export class GetSettingsFailedAction implements Action {
   readonly type = ReportsActionTypes.GET_SETTINGS_FAILED;
+
+  constructor(public payload: string) {
+  }
+}
+
+export class CreateSettingsAction implements Action {
+  readonly type = ReportsActionTypes.CREATE_SETTINGS;
+
+  constructor(public payload: IntegrationSettings) {
+  }
+}
+
+export class CreateSettingsCompleteAction implements Action {
+  readonly type = ReportsActionTypes.CREATE_SETTINGS_COMPLETE;
+
+  constructor(public payload: IntegrationSettings) {
+  }
+}
+
+export class CreateSettingsFailedAction implements Action {
+  readonly type = ReportsActionTypes.CREATE_SETTINGS_FAILED;
 
   constructor(public payload: string) {
   }
@@ -104,6 +128,9 @@ export type ReportsActions
   | GetSettingsAction
   | GetSettingsCompleteAction
   | GetSettingsFailedAction
+  | CreateSettingsAction
+  | CreateSettingsCompleteAction
+  | CreateSettingsFailedAction
   | UpdateSettingsAction
   | UpdateSettingsCompleteAction
   | UpdateSettingsFailedAction

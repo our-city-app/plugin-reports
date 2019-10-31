@@ -43,4 +43,4 @@ class TopdeskCallbackHandler(webapp2.RequestHandler):
             self.response.set_status(400)
             return
         message = data.get('message')
-        try_or_defer(incident_feedback, consumer.sik, incident_id, message)
+        try_or_defer(incident_feedback, consumer.integration_id, incident_id, message)

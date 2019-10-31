@@ -16,15 +16,13 @@
 # @@license_version:1.5@@
 from __future__ import unicode_literals
 
-from framework.to import TO
-from mcfw.properties import unicode_property, float_property, typed_property, \
-    long_property, object_factory, bool_property
-from plugins.reports.models import IncidentParams, IntegrationParams, Incident
-from plugins.rogerthat_api.to import PaginatedResultTO
+from plugins.rogerthat_api.to import PaginatedResultTO, UserDetailsTO
+from .forms import *
 
 
 class ReportsPluginConfiguration(TO):
     google_maps_key = unicode_property('google_maps_key')
+    oca_server_secret = unicode_property('oca_server_secret')
 
 
 class GeoPointTO(TO):
@@ -204,3 +202,18 @@ class IncidentTO(TO):
 
 class IncidentListTO(PaginatedResultTO):
     results = typed_property('results', IncidentTO, True)
+
+
+class FormSubmissionTO(TO):
+    id = long_property('id')
+    sections = typed_property('sections', FormSectionValueTO, True)
+    submitted_date = unicode_property('submitted_date')
+    version = long_property('version')
+    external_reference = typed_property('external_reference', dict)
+
+
+# See solutions.common.bizz.forms.integrations.green_valley
+class FormSubmittedCallback(TO):
+    form = typed_property('form', DynamicFormTO)  # type: DynamicFormTO
+    submission = typed_property('submission', FormSubmissionTO)  # type: FormSubmissionTO
+    user_details = typed_property('user_details', UserDetailsTO)  # type: UserDetailsTO

@@ -23,6 +23,7 @@ import { AddRoutesAction } from '../../framework/client/nav/sidebar/actions';
 import { IAppState } from '../../framework/client/ngrx';
 import { ThreePSettingsComponent } from './components/3p-settings/3p-settings.component';
 import { TopdeskFieldMappingComponent } from './components/field-mapping/topdesk-field-mapping.component';
+import { GreenValleySettingsComponent } from './components/green-valley-settings/green-valley-settings.component';
 import { IntegrationSettingsComponent } from './components/integration-settings/integration-settings.component';
 import { TopdeskSettingsComponent } from './components/topdesk-settings/topdesk-settings.component';
 import { CreateIntegrationPageComponent } from './pages/create-integration-page/create-integration-page.component';
@@ -50,7 +51,7 @@ const routes: Route[] = [
     component: CreateIntegrationPageComponent,
     data: { meta: { title: 'r.settings' } },
   }, {
-    path: 'integrations/:sik',
+    path: 'integrations/:id',
     canActivate: [MetaGuard],
     component: IntegrationSettingsPageComponent,
     data: { meta: { title: 'r.settings' } },
@@ -85,6 +86,7 @@ const routes: Route[] = [
     TopdeskFieldMappingComponent,
     IntegrationSettingsComponent,
     ThreePSettingsComponent,
+    GreenValleySettingsComponent,
   ],
   providers: [
     {

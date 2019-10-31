@@ -15,14 +15,16 @@
 #
 # @@license_version:1.5@@
 from framework.to import TO
-from mcfw.properties import typed_property, unicode_property
+from mcfw.properties import typed_property, unicode_property, long_property
 from plugins.reports.models import INTEGRATION_SETTINGS_DATA, IntegrationSettings
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 
 
 class IntegrationTO(TO):
+    id = long_property('id')
     name = unicode_property('name')
     sik = unicode_property('sik')
+    consumer_id = unicode_property('consumer_id')
     rogerthat_api_key = unicode_property('rogerthat_api_key')
     data = typed_property('data', INTEGRATION_SETTINGS_DATA)
 
@@ -30,8 +32,10 @@ class IntegrationTO(TO):
     def from_model(cls, model, rogerthat_settings):
         # type: (IntegrationSettings, RogerthatSettings) -> IntegrationTO
         return cls(
-            sik=model.sik,
+            id=model.id,
             name=model.name,
+            sik=model.sik,
             rogerthat_api_key=rogerthat_settings and rogerthat_settings.api_key,
+            consumer_id=model.consumer_id,
             data=model.data,
         )

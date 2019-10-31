@@ -16,34 +16,39 @@
 # @@license_version:1.5@@
 from google.appengine.ext import ndb
 
-from mcfw.consts import MISSING
 from mcfw.exceptions import HttpNotFoundException
 from plugins.reports.bizz.elasticsearch import re_index_incident
-from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident, \
-    TopdeskSettings
+from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident
 from plugins.reports.to import IncidentTO
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 from plugins.rogerthat_api.to import UserDetailsTO
 from typing import List, Tuple
 
 
-def save_integration_settings(sik, rogerthat_api_key, name, data):
-    # type: (str, str, str, IntegrationSettingsData) -> Tuple[IntegrationSettings, RogerthatSettings]
-    k = IntegrationSettings.create_key(sik)
-    settings = k.get() or IntegrationSettings(key=k)
+def save_integration_settings(integration_id, rogerthat_api_key, name, consumer_id, sik, data):
+    # type: (int, str, str, str, str, IntegrationSettingsData) -> Tuple[IntegrationSettings, RogerthatSettings]
+    if not integration_id:
+        settings = IntegrationSettings(key=IntegrationSettings.create_key(IntegrationSettings.allocate_ids(1)[0]))
+    else:
+        settings = IntegrationSettings.create_key(integration_id).get()
     settings.integration = data.provider
     settings.name = name
+
     rogerthat_settings = RogerthatSettings(key=RogerthatSettings.create_key(sik))
     rogerthat_settings.ref = name
     rogerthat_settings.api_key = rogerthat_api_key
-    to_put = [settings, rogerthat_settings]
-    if isinstance(settings.data, TopdeskSettings):
-        if settings.data.consumer and settings.data.consumer is not MISSING:
-            Consumer.create_key(settings.data.consumer).delete()
-    if isinstance(data, TopdeskSettings):
-        to_put.append(Consumer(key=Consumer.create_key(data.consumer), ref=name, sik=sik))
+
+    if settings.consumer_id:
+        Consumer.create_key(settings.consumer_id).delete()
+    settings.consumer_id = consumer_id
+    settings.sik = sik
+
+    consumer = Consumer(key=Consumer.create_key(sik))
+    consumer.ref = name
+    consumer.integration_id = integration_id
+
     settings.data = data
-    ndb.put_multi(to_put)
+    ndb.put_multi([settings, rogerthat_settings, consumer])
     return settings, rogerthat_settings
 
 
@@ -52,18 +57,20 @@ def list_integrations():
     return IntegrationSettings.list()
 
 
-def get_integration_settings(sik):
-    settings = IntegrationSettings.create_key(sik).get()
+def get_integration_settings(integration_id):
+    # type: (int) -> IntegrationSettings
+    settings = IntegrationSettings.create_key(integration_id).get()
     if not settings:
-        raise HttpNotFoundException('settings_not_found', {'sik': sik})
+        raise HttpNotFoundException('settings_not_found', {'integration_id': integration_id})
     return settings
 
 
-def get_integration_settings_tuple(sik):
-    # type: (str) -> Tuple[IntegrationSettings, RogerthatSettings]
-    settings, rt_settings = ndb.get_multi([IntegrationSettings.create_key(sik), RogerthatSettings.create_key(sik)])
+def get_integration_settings_tuple(integration_id):
+    # type: (int) -> Tuple[IntegrationSettings, RogerthatSettings]
+    settings = IntegrationSettings.create_key(integration_id).get()
+    rt_settings = RogerthatSettings.create_key(settings.sik).get() if settings.sik else None
     if not settings:
-        raise HttpNotFoundException('settings_not_found', {'sik': sik})
+        raise HttpNotFoundException('settings_not_found', {'integration_id': integration_id})
     return settings, rt_settings
 
 
@@ -99,9 +106,9 @@ def get_incident(incident_id):
     return Incident.create_key(incident_id).get()
 
 
-def get_incident_by_external_id(sik, external_id):
-    # type: (str, str) -> Incident
-    return Incident.get_by_external_id(sik, external_id)
+def get_incident_by_external_id(integration_id, external_id):
+    # type: (int, str) -> Incident
+    return Incident.get_by_external_id(integration_id, external_id)
 
 
 def update_incident(incident, data):

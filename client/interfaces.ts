@@ -69,6 +69,7 @@ export interface TopdeskData {
 export enum IntegrationProvider {
   TOPDESK = 'topdesk',
   THREE_P = '3p',
+  GREEN_VALLEY = 'green_valley',
 }
 
 export interface TopdeskSettings {
@@ -86,7 +87,6 @@ export interface TopdeskSettings {
   operator_group_id: string | null;
   unregistered_users: boolean;
   field_mapping: FieldMapping[];
-  consumer: string;
 }
 
 export interface ThreePSettings {
@@ -94,13 +94,22 @@ export interface ThreePSettings {
   gcs_bucket_name: string;
 }
 
-export type IntegrationSettingsData = TopdeskSettings | ThreePSettings;
+export interface GreenValleySettings {
+  provider: IntegrationProvider.GREEN_VALLEY;
+  username: string;
+  password: string;
+  base_url: string;
+}
 
-export type IntegrationList = { sik: string; name: string }[];
+export type IntegrationSettingsData = TopdeskSettings | ThreePSettings | GreenValleySettings;
+
+export type IntegrationList = { id: number; name: string }[];
 
 export interface IntegrationSettings {
+  id?: number;
   name: string;
   sik: string;
+  consumer_id: string;
   rogerthat_api_key: string;
   data: IntegrationSettingsData;
 }

@@ -21,17 +21,27 @@ export class ReportsEffects {
 
   @Effect() getSettings$ = this.actions$.pipe(
     ofType<actions.GetSettingsAction>(ReportsActionTypes.GET_SETTINGS),
-    switchMap(action => this.settingsService.getSettings(action.sik).pipe(
+    switchMap(action => this.settingsService.getSettings(action.payload.id).pipe(
       map(result => new actions.GetSettingsCompleteAction(result)),
       catchError(error => this.errorService.fromAction(actions.GetSettingsFailedAction, error)),
     )));
 
+  @Effect() createSettings$ = this.actions$.pipe(
+    ofType<actions.CreateSettingsAction>(ReportsActionTypes.CREATE_SETTINGS),
+    switchMap(action => this.settingsService.createSettings(action.payload).pipe(
+      map(result => new actions.CreateSettingsCompleteAction(result)),
+      tap(result => {
+        this.router.navigate(['/integrations', result.payload.id]);
+      }),
+      catchError(error => this.errorService.fromAction(actions.CreateSettingsFailedAction, error)),
+    )));
+
   @Effect() updateSettings$ = this.actions$.pipe(
     ofType<actions.UpdateSettingsAction>(ReportsActionTypes.UPDATE_SETTINGS),
-    switchMap(action => this.settingsService.saveSettings(action.payload.sik, action.payload).pipe(
+    switchMap(action => this.settingsService.saveSettings(action.payload.id as number, action.payload).pipe(
       map(result => new actions.UpdateSettingsCompleteAction(result)),
-      tap(() => {
-        this.router.navigate(['/integrations', action.payload.sik]);
+      tap(result => {
+        this.router.navigate(['/integrations', result.payload.id]);
       }),
       catchError(error => this.errorService.fromAction(actions.UpdateSettingsFailedAction, error)),
     )));

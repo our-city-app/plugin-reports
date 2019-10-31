@@ -1,10 +1,10 @@
 indexes:
   - kind: Incident
     properties:
-      - name: sik
+      - name: integration_id
       - name: external_id
   - kind: Incident
     properties:
-      - name: sik
+      - name: integration_id
       - name: report_date
         direction: desc

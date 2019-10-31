@@ -1,5 +1,5 @@
 <mat-nav-list>
-  <a mat-list-item [routerLink]="setting.sik" *ngFor="let setting of settings$ | async">
+  <a mat-list-item [routerLink]="setting.id" *ngFor="let setting of settings$ | async">
     {{ setting.name }}
   </a>
   <div class="r-fab-bottom-right">

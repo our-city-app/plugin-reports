@@ -12,12 +12,16 @@ export class ReportsService {
     return this.http.get<IntegrationList>(`${ReportsConfig.API_URL}/integrations`);
   }
 
-  getSettings(sik: string) {
-    return this.http.get<IntegrationSettings>(`${ReportsConfig.API_URL}/integrations/${sik}`);
+  getSettings(id: number) {
+    return this.http.get<IntegrationSettings>(`${ReportsConfig.API_URL}/integrations/${id}`);
   }
 
-  saveSettings(sik: string, settings: IntegrationSettings) {
-    return this.http.put<IntegrationSettings>(`${ReportsConfig.API_URL}/integrations/${sik}`, settings);
+  createSettings(settings: IntegrationSettings) {
+    return this.http.post<IntegrationSettings>(`${ReportsConfig.API_URL}/integrations`, settings);
+  }
+
+  saveSettings(id: number, settings: IntegrationSettings) {
+    return this.http.put<IntegrationSettings>(`${ReportsConfig.API_URL}/integrations/${id}`, settings);
   }
 
   getTopdeskData(settings: TopdeskSettings) {

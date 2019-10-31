@@ -8,7 +8,7 @@
     "call_type": "Call type",
     "caller_branch": "Caller branch",
     "category": "Category",
-    "consumer_hint": "Shared secret between this server and remote server",
+    "consumer_hint": "Shared secret between this server and OCA server",
     "create_integration": "Create integration",
     "edit_integration": "Edit integration",
     "enabled": "Enabled",

@@ -42,7 +42,6 @@ def create_incident(settings, rt_user, incident, steps):
         logging.debug('3P incident XML: %s', xml_content)
     incident.details = details
     incident.user_consent = user_consent
-    incident.visible = incident.can_show_on_map
     config = settings.data  # type: ThreePSettings
     deferred.defer(create_incident_on_gcs, config.gcs_bucket_name, incident.id, xml_content,
                    _queue=INCIDENTS_QUEUE)
@@ -167,7 +166,7 @@ def create_incident_on_gcs(gcs_bucket_name, incident_id, xml_content, attempt=1)
 
 def incident_follow_up(from_, regex, subject, body):
     # todo-later security validate from
-    incident_id = long(regex.groupdict()['incident_id'])
+    incident_id = regex.groupdict()['incident_id']
     incident = get_incident(incident_id)
     if not incident:
         logging.debug("Received incident update that is not in our database: '%s'", incident_id)
@@ -180,7 +179,8 @@ def incident_follow_up(from_, regex, subject, body):
         try_or_defer(re_index_incident, incident)
     if isinstance(incident.params, IncidentParamsFlow):
         parent_message_key = incident.params.parent_message_key
-        try_or_defer(send_rogerthat_message, incident.sik, member, body, parent_message_key=parent_message_key,
+        settings = IntegrationSettings.create_key(incident.integration_id)  # type: IntegrationSettings
+        try_or_defer(send_rogerthat_message, settings.sik, member, body, parent_message_key=parent_message_key,
                      json_rpc_id=guid())
     else:
         raise Exception('Can\'t process incident feedback with invalid params: %s', incident.params)

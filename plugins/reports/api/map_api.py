@@ -17,17 +17,18 @@
 import logging
 
 from framework.bizz.authentication import get_browser_language
+from framework.plugin_loader import get_config
 from mcfw.exceptions import HttpBadRequestException
 from mcfw.restapi import rest
 from mcfw.rpc import returns, arguments
 from plugins.reports.bizz.map import get_report_map_items, get_reports_map_item_details, vote_report_item
-from plugins.reports.dal import get_consumer
+from plugins.reports.consts import NAMESPACE
 from plugins.reports.to import GetMapItemsResponseTO, GetMapItemDetailsResponseTO, ItemVoteTO, SaveMapItemVoteResponseTO
 
 
 def validate_request(f, handler):
-    consumer_key = handler.request.headers.get('Authorization', None)
-    return get_consumer(consumer_key) is not None
+    auth = handler.request.headers.get('Authorization', None)
+    return auth == get_config(NAMESPACE).oca_server_secret
 
 
 @rest('/items', 'get', silent_result=True, custom_auth_method=validate_request)

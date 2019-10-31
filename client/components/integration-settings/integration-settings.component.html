@@ -9,7 +9,7 @@
   </mat-form-field>
   <mat-form-field>
     <mat-label>{{ 'r.service_identity_key' | translate }}</mat-label>
-    <input name="sik" matInput [(ngModel)]="settings.sik" required [readonly]="isEdit">
+    <input name="sik" matInput [(ngModel)]="settings.sik" required>
   </mat-form-field>
   <mat-form-field>
     <mat-label>{{ 'r.rogerthat_api_key' | translate }}</mat-label>
@@ -18,6 +18,11 @@
   <mat-form-field>
     <mat-label>{{ 'r.name' | translate }}</mat-label>
     <input name="name" matInput [(ngModel)]="settings.name" required>
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>{{ 'r.secret' | translate }}</mat-label>
+    <input name="consumer" matInput [(ngModel)]="settings.consumer_id" required>
+    <mat-hint>{{ 'r.consumer_hint' | translate }}</mat-hint>
   </mat-form-field>
   <ng-container [ngSwitch]="settings.data.provider">
     <r-topdesk-settings name="data"
@@ -28,6 +33,9 @@
     <r-3p-settings name="data"
                    [(ngModel)]="settings.data"
                    *ngSwitchCase="IntegrationProvider.THREE_P"></r-3p-settings>
+    <r-green-valley-settings name="data"
+                   [(ngModel)]="settings.data"
+                   *ngSwitchCase="IntegrationProvider.GREEN_VALLEY"></r-green-valley-settings>
   </ng-container>
   <div>
     <button mat-raised-button>{{ 'r.submit' | translate }}</button>

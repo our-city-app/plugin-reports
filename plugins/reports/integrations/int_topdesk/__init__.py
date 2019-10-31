@@ -180,7 +180,6 @@ def create_incident(config, rt_user, incident, steps):
     incident.integration_params = integration_params
     incident.external_id = response['number']  # e.g. M 1602 341
     incident.user_consent = user_consent
-    incident.visible = incident.can_show_on_map
 
 
 def get_field_mapping_values(settings, steps):
@@ -281,17 +280,19 @@ def get_reverse_value(settings, property_name, value, custom_values):
                 return thing['id']
 
 
-def incident_feedback(sik, incident_id, message):
-    incident = get_incident_by_external_id(sik, incident_id)
+def incident_feedback(integration_id, incident_id, message):
+    # type: (int, str, str) -> None
+    incident = get_incident_by_external_id(integration_id, incident_id)
     if not incident:
-        logging.debug('Received incident update for incident that is not in our database: %s', incident_id)
+        logging.debug('Received incident update for incident that is not in our database: %s\nIntegration id: %s',
+                      incident_id, integration_id)
         return
-    settings = get_integration_settings(sik)
+    settings = get_integration_settings(integration_id)
     if not settings:
-        logging.error('Could not find topdesk settings for %s', sik)
+        logging.error('Could not find topdesk settings for %s', integration_id)
         return
     logging.debug('Received incident feedback: %s', incident_id)
-    response = topdesk_api_call(settings.data, '/api/incidents/id/%s' % incident_id)
+    response = topdesk_api_call(settings.data, '/api/incidents/number/%s' % incident_id)
     logging.debug("Incident result from server: %s", response)
     status = response['processingStatus']
     params = incident.integration_params  # type: IntegrationParamsTopdesk
@@ -320,7 +321,7 @@ def incident_feedback(sik, incident_id, message):
         member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
         complete_message = '\n'.join(message_lines)
         if isinstance(incident.params, IncidentParamsFlow):
-            try_or_defer(send_rogerthat_message, sik, member, complete_message,
+            try_or_defer(send_rogerthat_message, settings.sik, member, complete_message,
                          parent_message_key=incident.params.parent_message_key, json_rpc_id=guid())
         else:
             raise Exception('Can\'t process incident feedback with invalid params: %s', incident.params)

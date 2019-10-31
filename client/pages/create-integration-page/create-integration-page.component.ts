@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ViewEncapsulation } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { IntegrationSettings } from '../../interfaces';
-import { UpdateSettingsAction } from '../../reports.actions';
+import { CreateSettingsAction } from '../../reports.actions';
 import { IReportsState } from '../../reports.state';
 
 @Component({
@@ -16,6 +16,6 @@ export class CreateIntegrationPageComponent {
   }
 
   saveSettings(settings: IntegrationSettings) {
-    this.store.dispatch(new UpdateSettingsAction(settings));
+    this.store.dispatch(new CreateSettingsAction(settings));
   }
 }

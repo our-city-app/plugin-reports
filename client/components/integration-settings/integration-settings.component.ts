@@ -28,6 +28,7 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
   integrationProviders = [
     { value: IntegrationProvider.TOPDESK, label: 'TOPdesk' },
     { value: IntegrationProvider.THREE_P, label: '3P' },
+    { value: IntegrationProvider.GREEN_VALLEY, label: 'Green Valley' },
   ];
   IntegrationProvider = IntegrationProvider;
   @Input() settings?: IntegrationSettings;
@@ -63,8 +64,9 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
       case IntegrationProvider.TOPDESK:
         this.settings = {
           name: 'TOPdesk',
-          rogerthat_api_key: '',
           sik: '',
+          rogerthat_api_key: '',
+          consumer_id: '',
           data: {
             provider,
             unregistered_users: false,
@@ -80,7 +82,6 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
             category_id: null,
             sub_category_id: null,
             field_mapping: [],
-            consumer: '',
           },
         };
         break;
@@ -89,12 +90,26 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
           name: '3P',
           sik: '',
           rogerthat_api_key: '',
+          consumer_id: '',
           data: {
             provider,
             gcs_bucket_name: '',
           },
         };
         break;
+      case IntegrationProvider.GREEN_VALLEY:
+        this.settings = {
+          name: 'Green Valley',
+          sik: '',
+          rogerthat_api_key: '',
+          consumer_id: '',
+          data: {
+            provider,
+            username: 'OSA',
+            password: '',
+            base_url: 'https://suite-*********.onlinesmartcities.be',
+          },
+        };
     }
   }
 }

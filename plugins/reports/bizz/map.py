@@ -22,6 +22,7 @@ from plugins.reports.bizz import update_incident_vote, get_vote_options, convert
 from plugins.reports.bizz.elasticsearch import search_current
 from plugins.reports.models import Incident, UserIncidentVote, IncidentStatus, ReportsFilter, IncidentVote
 from plugins.reports.to import GetMapItemsResponseTO, GetMapItemDetailsResponseTO, SaveMapItemVoteResponseTO
+from typing import List
 
 
 def convert_filter_to_status(filter_value):
@@ -52,16 +53,21 @@ def get_reports_map_item_details(ids, user_id, language):
     # type: (list[unicode], unicode, unicode) -> GetMapItemDetailsResponseTO
     if not ids or not user_id:
         return GetMapItemDetailsResponseTO()
-    incidents = ndb.get_multi([Incident.create_key(uid) for uid in ids])
-    extra_keys = [IncidentVote.create_key(incident.id) for incident in incidents] + \
-                 [UserIncidentVote.create_key(user_id, incident.id) for incident in incidents]
+    incidents = ndb.get_multi([Incident.create_key(uid) for uid in ids])  # type: List[Incident]
+    extra_keys = [IncidentVote.create_key(incident.id) for incident in incidents if incident.can_show_votes] + \
+                 [UserIncidentVote.create_key(user_id, incident.id) for incident in incidents if incident.can_show_votes]
     extra_models = ndb.get_multi(extra_keys)
-    count = len(incidents)
-    votes = extra_models[:count]
-    user_votes = extra_models[count:]
-    items = [convert_to_item_details_to(incident, vote, user_vote, language) for incident, vote, user_vote in
-             zip(incidents, votes, user_votes)]
-    return GetMapItemDetailsResponseTO(items=items)
+    vote_mapping = {}
+    user_vote_mapping = {}
+    for model in extra_models:
+        if isinstance(model, IncidentVote):
+            vote_mapping[model.incident_id] = model
+        elif isinstance(model, UserIncidentVote):
+            user_vote_mapping[model.incident_id] = model
+    return GetMapItemDetailsResponseTO(items=[
+        convert_to_item_details_to(i, vote_mapping.get(i.id), user_vote_mapping.get(i.id), language)
+        for i in incidents
+    ])
 
 
 def vote_report_item(item_id, user_id, vote_id, option_id, language):

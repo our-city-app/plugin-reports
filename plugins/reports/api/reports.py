@@ -18,12 +18,13 @@
 from mcfw.exceptions import HttpForbiddenException
 from mcfw.restapi import rest, GenericRESTRequestHandler
 from mcfw.rpc import returns, arguments
-from plugins.reports.bizz.incidents import list_incidents
+from plugins.reports.bizz.incidents import list_incidents, create_incident_from_form
 from plugins.reports.dal import get_consumer, get_incident, update_incident
-from plugins.reports.to import IncidentListTO, IncidentTO
+from plugins.reports.models import FormIntegration, SaveFormIntegrationTO
+from plugins.reports.to import IncidentListTO, IncidentTO, FormSubmittedCallback
 
 
-def get_sik():
+def get_auth_header():
     return GenericRESTRequestHandler.get_current_request().headers.get('Authorization')
 
 
@@ -32,14 +33,32 @@ def validate_request(f, handler):
     return get_consumer(consumer_key) is not None
 
 
+@rest('/incidents/integrations/form', 'put', silent_result=True)
+@returns(dict)
+@arguments(data=SaveFormIntegrationTO)
+def api_save_form_settings(data):
+    # type: (SaveFormIntegrationTO) -> dict
+    consumer_id = get_auth_header()
+    if not consumer_id:
+        raise HttpForbiddenException()
+    consumer = get_consumer(consumer_id)
+    key = FormIntegration.create_key(data.form_id)
+    form_integration = key.get() or FormIntegration(key=key)
+    form_integration.config = data.config
+    form_integration.integration_id = consumer.integration_id
+    form_integration.put()
+    return form_integration.to_dict()
+
+
 @rest('/incidents', 'get', silent_result=True)
 @returns(IncidentListTO)
 @arguments()
 def api_get_incidents():
-    sik = get_sik()
-    if not sik:
+    consumer_id = get_auth_header()
+    if not consumer_id:
         raise HttpForbiddenException()
-    results, cursor, more = list_incidents(sik, 50)
+    consumer = get_consumer(consumer_id)
+    results, cursor, more = list_incidents(consumer.integration_id, 50)
     return IncidentListTO(cursor and cursor.to_websafe_string(), more, [IncidentTO.from_model(i) for i in results])
 
 
@@ -48,8 +67,11 @@ def api_get_incidents():
 @arguments(incident_id=unicode)
 def api_get_incident(incident_id):
     incident = get_incident(incident_id)
-    sik = get_sik()
-    if not sik or (incident and incident.sik != sik):
+    consumer_id = get_auth_header()
+    if not consumer_id:
+        raise HttpForbiddenException()
+    consumer = get_consumer(consumer_id)
+    if not consumer or (incident and incident.integration_id != consumer.integration_id):
         raise HttpForbiddenException()
     return IncidentTO.from_model(incident)
 
@@ -59,7 +81,24 @@ def api_get_incident(incident_id):
 @arguments(incident_id=unicode, data=IncidentTO)
 def api_save_incident(incident_id, data):
     incident = get_incident(incident_id)
-    sik = get_sik()
-    if not sik or (incident and incident.sik != sik):
+    consumer_id = get_auth_header()
+    if not consumer_id:
+        raise HttpForbiddenException()
+    consumer = get_consumer(consumer_id)
+    if not consumer or (incident and incident.integration_id != consumer.integration_id):
         raise HttpForbiddenException()
     return IncidentTO.from_model(update_incident(incident, data))
+
+
+@rest('/callbacks/form/<form_id:[^/]+>', 'post', silent_result=True)
+@returns(dict)
+@arguments(form_id=(int, long), data=FormSubmittedCallback)
+def api_form_callback(form_id, data):
+    # type: (int, FormSubmittedCallback) -> str
+    consumer_id = get_auth_header()
+    if not consumer_id:
+        raise HttpForbiddenException()
+    consumer = get_consumer(consumer_id)
+    if not consumer:
+        raise HttpForbiddenException()
+    return {'external_reference': create_incident_from_form(consumer.integration_id, data)}

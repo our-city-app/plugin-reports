@@ -31,8 +31,8 @@ export class IntegrationSettingsPageComponent implements OnInit {
   }
 
   ngOnInit() {
-    const sik = this.route.snapshot.params.sik;
-    this.store.dispatch(new GetSettingsAction(sik));
+    const id: number = parseInt(this.route.snapshot.params.id, 10);
+    this.store.dispatch(new GetSettingsAction({ id }));
     this.settings$ = this.store.pipe(select(getSettings));
   }
 

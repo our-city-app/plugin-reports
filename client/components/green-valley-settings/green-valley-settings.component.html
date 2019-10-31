@@ -1,0 +1,14 @@
+<ng-container *ngIf="settings">
+  <mat-form-field>
+    <mat-label>Username</mat-label>
+    <input name="username" matInput [(ngModel)]="settings.username" (ngModelChange)="changed()">
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>Password</mat-label>
+    <input name="password" matInput [(ngModel)]="settings.password" (ngModelChange)="changed()">
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>Base url</mat-label>
+    <input name="base_url" matInput [(ngModel)]="settings.base_url" (ngModelChange)="changed()">
+  </mat-form-field>
+</ng-container>
