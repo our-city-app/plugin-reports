@@ -17,6 +17,7 @@
 import json
 import logging
 import urllib
+from HTMLParser import HTMLParser
 from base64 import b64encode, b64decode
 
 import webapp2
@@ -137,7 +138,8 @@ def _send_notification(notifications, incident_key, integration_id):
     server_url = get_server_url()
     for notification in notifications:
         incident.integration_params.notification_ids.append(notification.id)
-        message = html_to_markdown(notification.message)
+        unescaped = HTMLParser().unescape(notification.message)
+        message = html_to_markdown(unescaped)
         if not message:
             continue
         attachments = []
