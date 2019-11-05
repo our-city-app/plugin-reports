@@ -17,7 +17,11 @@
 
 from __future__ import unicode_literals
 
-from framework.plugin_loader import Plugin, get_plugin
+import webapp2
+
+from framework.bizz.authentication import get_current_session
+from framework.handlers import render_logged_in_page
+from framework.plugin_loader import Plugin, get_plugin, get_auth_plugin
 from framework.utils.plugins import Handler, Module
 from mcfw.consts import NOT_AUTHENTICATED
 from mcfw.restapi import rest_functions
@@ -37,6 +41,14 @@ from plugins.reports.to import ReportsPluginConfiguration
 from plugins.rogerthat_api.rogerthat_api_plugin import RogerthatApiPlugin
 
 
+class IndexHandler(webapp2.RequestHandler):
+    def get(self):
+        if get_current_session():
+            render_logged_in_page(self)
+        else:
+            self.redirect(get_auth_plugin().get_login_url())
+
+
 class ReportsPlugin(Plugin):
     def __init__(self, configuration):
         super(ReportsPlugin, self).__init__(configuration)
@@ -52,6 +64,7 @@ class ReportsPlugin(Plugin):
 
     def get_handlers(self, auth):
         if auth == Handler.AUTH_UNAUTHENTICATED:
+            yield Handler(url='/', handler=IndexHandler)
             yield Handler(url='/plugins/reports/topdesk/callback_api', handler=TopdeskCallbackHandler)
             for mod in [map_api, reports]:
                 for url, handler in rest_functions(mod, authentication=NOT_AUTHENTICATED):
