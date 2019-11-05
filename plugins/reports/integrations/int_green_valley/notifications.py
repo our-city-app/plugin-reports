@@ -177,7 +177,8 @@ class NotificationsCronHandler(webapp2.RequestHandler):
         qry = IntegrationSettings.list_by_integration(
             IntegrationProvider.GREEN_VALLEY)  # type: List[IntegrationSettings]
         for integration in qry:
-            run_job(_get_all_incidents, [integration.id], check_for_new_notifications, [integration.id])
+            if isinstance(integration.data, GreenValleySettings) and integration.data.gateway_client_secret:
+                run_job(_get_all_incidents, [integration.id], check_for_new_notifications, [integration.id])
 
 
 class NotificationAttachmentHandler(webapp2.RequestHandler):
