@@ -292,7 +292,7 @@ def incident_feedback(integration_id, incident_id, message):
         logging.error('Could not find topdesk settings for %s', integration_id)
         return
     logging.debug('Received incident feedback: %s', incident_id)
-    response = topdesk_api_call(settings.data, '/api/incidents/number/%s' % incident_id)
+    response = topdesk_api_call(settings.data, '/api/incidents/id/%s' % incident.integration_params.id)
     logging.debug("Incident result from server: %s", response)
     status = response['processingStatus']
     params = incident.integration_params  # type: IntegrationParamsTopdesk
