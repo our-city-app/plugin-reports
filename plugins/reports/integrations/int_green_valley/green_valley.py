@@ -26,9 +26,10 @@ from google.appengine.ext.ndb import GeoPt
 from lxml import etree
 from mcfw.consts import DEBUG
 from plugins.reports.integrations.int_green_valley.attachments import get_attachment_content
-from plugins.reports.models import GreenValleySettings, Incident, IncidentDetails, IncidentStatus
+from plugins.reports.models import GreenValleySettings, Incident, IncidentDetails, IncidentStatus, \
+    IntegrationParamsGreenValley
 from plugins.reports.models.green_valley import GvMappingFlex, GreenValleyFormConfiguration, GvMappingAttachment, \
-    GvMappingLocation, GvMappingPerson, GvMappingField, GvMappingConst
+    GvMappingLocation, GvMappingPerson, GvMappingField, GvMappingConst, GvMappingConsent
 from plugins.reports.to import FormSubmissionTO, FieldComponentTO, DynamicFormTO, TextInputComponentValueTO, \
     MultiSelectComponentValueTO, SingleSelectComponentValueTO, LocationComponentValueTO, \
     FileComponentValueTO, MultiSelectComponentTO, ValueTO
@@ -134,9 +135,6 @@ class IncidentDescription(object):
         # type: (FieldComponentTO, object, object) -> object
         if not value or field in ('type_id', 'type'):
             return
-        if component and component.sensitive:
-            logging.debug('Skipping sensitive question: %s' % component.title)
-            return
         if field == 'subject':
             self.title = value
             return
@@ -179,6 +177,7 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
     details = IncidentDetails()
     details.status = IncidentStatus.NEW
     desc = IncidentDescription()
+    user_consent = False
 
     # TODO: add markdown 'question value' or something
     # That way we can add `*kleur fiets*: groen` instead of `*wat is het kleur van de fiets?*: groen`
@@ -253,7 +252,11 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
                                 if chosen_value:
                                     _add_flex(flexes, gv_comp.field_def_id, value, chosen_value.label)
                             desc.add(component, choices_to_markdown(comp_val, component))
-
+            elif isinstance(gv_comp, GvMappingConsent):
+                if isinstance(comp_val, SingleSelectComponentValueTO):
+                    user_consent = gv_comp.value_id == comp_val.value
+                elif isinstance(comp_val, MultiSelectComponentValueTO):
+                    user_consent = gv_comp.value_id in comp_val.values
             else:
                 raise Exception('Unknown component type: %s' % gv_comp)
     if flexes:
@@ -262,6 +265,10 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
         person[ATTR_PREFIX + 'sequence'] = '1'
         person[ATTR_PREFIX + 'group_type'] = 'REQUESTER'
         request['agents'] = {'person': person}
+
+    if not request.get('description') and not person:
+        logging.info('Not creating case: not enough information')
+        return
 
     property_order = [
         'type_id',
@@ -309,5 +316,5 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
                   re.sub(r'<content>.*?</content>', r'<content>(content omitted)</content>', body))
     result = _execute_gv_request(gv_settings, '/cases', urlfetch.POST, body)
     incident.external_id = etree.XML(result).get('id')
-    # TODO ask user consent in form
-    incident.user_consent = True
+    incident.user_consent = user_consent
+    incident.integration_params = IntegrationParamsGreenValley(notification_ids=[])

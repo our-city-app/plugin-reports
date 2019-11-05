@@ -26,6 +26,7 @@ class GvFieldType(object):
     LOCATION = 'location'
     FIELD = 'field'
     ATTACHMENT = 'attachment'
+    CONSENT = 'consent'
 
 
 class GvMappingFlex(TO):
@@ -72,6 +73,12 @@ class GvMappingAttachment(GvMappingFlex):
     name = unicode_property('name')
 
 
+class GvMappingConsent(TO):
+    type = unicode_property('type', default=GvFieldType.CONSENT)
+    id = unicode_property('id')
+    value_id = unicode_property('value_id')
+
+
 GV_MAPPING = {
     GvFieldType.FLEX: GvMappingFlex,
     GvFieldType.CONST: GvMappingConst,
@@ -79,6 +86,7 @@ GV_MAPPING = {
     GvFieldType.LOCATION: GvMappingLocation,
     GvFieldType.FIELD: GvMappingField,
     GvFieldType.ATTACHMENT: GvMappingAttachment,
+    GvFieldType.CONSENT: GvMappingConsent,
 }
 
 

@@ -29,6 +29,8 @@ from plugins.reports.api import map_api, reports
 from plugins.reports.bizz.rtemail import EmailHandler
 from plugins.reports.handlers.cron import ReportsCleanupTimedOutHandler
 from plugins.reports.integrations import integrations_api
+from plugins.reports.integrations.int_green_valley.notifications import NotificationsCronHandler, \
+    NotificationAttachmentHandler
 from plugins.reports.integrations.int_topdesk.handlers import TopdeskCallbackHandler
 from plugins.reports.permissions import ROLE_GROUPS, ReportsPermission
 from plugins.reports.to import ReportsPluginConfiguration
@@ -56,9 +58,13 @@ class ReportsPlugin(Plugin):
                     yield Handler(url=url, handler=handler)
             for url, handler in rest_functions(integrations_api, authentication=NOT_AUTHENTICATED):
                 yield Handler(url=url, handler=handler)
+            yield Handler(
+                '/plugins/reports/green_valley/<integration_id:[^/]+>/notifications/<notification_id:[^/]+>/attachments/<attachment_id:[^/]+>',
+                NotificationAttachmentHandler)
         if auth == Handler.AUTH_ADMIN:
             yield Handler(url='/_ah/mail/<email:.*>', handler=EmailHandler)
             yield Handler(url='/admin/cron/reports/cleanup/timed_out', handler=ReportsCleanupTimedOutHandler)
+            yield Handler(url='/admin/cron/reports/green-valley-notifications', handler=NotificationsCronHandler)
 
     def get_modules(self):
         yield Module('integrations', [], 1)

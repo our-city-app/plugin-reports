@@ -87,6 +87,9 @@ class GreenValleySettings(TO):
     username = unicode_property('username')
     password = unicode_property('password')
     base_url = unicode_property('base_url')
+    realm = unicode_property('realm')
+    gateway_client_id = unicode_property('gateway_client_id')
+    gateway_client_secret = unicode_property('gateway_client_secret')
 
 
 INTEGRATION_SETTINGS_MAPPING = {
@@ -147,8 +150,16 @@ class IntegrationParamsTopdesk(TO):
     last_message = unicode_property('last_message')  # last message sent by operator
 
 
+class IntegrationParamsGreenValley(TO):
+    t = unicode_property('t', default=IntegrationProvider.GREEN_VALLEY)
+    # ids of the notifications that have already been forwarded to the user
+    notification_ids = unicode_list_property('notification_ids', default=[])
+    parent_message_id = unicode_property('parent_message_id', default=None)
+
+
 INTEGRATION_PARAMS_MAPPING = {
     IntegrationProvider.TOPDESK: IntegrationParamsTopdesk,
+    IntegrationProvider.GREEN_VALLEY: IntegrationParamsGreenValley,
 }
 
 
@@ -174,7 +185,7 @@ class FormIntegrationConfig(object_factory):
 class IntegrationSettings(NdbModel):
     NAMESPACE = NAMESPACE
 
-    integration = ndb.StringProperty(indexed=False)
+    integration = ndb.StringProperty(choices=IntegrationProvider.all())
     name = ndb.StringProperty()
     consumer_id = ndb.StringProperty()
     sik = ndb.StringProperty()
@@ -191,6 +202,10 @@ class IntegrationSettings(NdbModel):
     @classmethod
     def list(cls):
         return cls.query().order(cls.name)
+
+    @classmethod
+    def list_by_integration(cls, integration):
+        return cls.query().filter(cls.integration == integration)
 
 
 class Consumer(NdbModel):
@@ -315,12 +330,13 @@ class Incident(NdbModel):
 
 
 class FormIntegration(NdbModel):
+    NAMESPACE = NAMESPACE
     integration_id = ndb.IntegerProperty()  # IntegrationSettings id
     config = TOProperty(FormIntegrationConfig())
 
     @classmethod
     def create_key(cls, form_id):
-        return ndb.Key(cls, form_id)
+        return ndb.Key(cls, form_id, namespace=NAMESPACE)
 
 
 class SaveFormIntegrationTO(TO):

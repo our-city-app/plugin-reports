@@ -99,6 +99,9 @@ export interface GreenValleySettings {
   username: string;
   password: string;
   base_url: string;
+  realm: string;
+  gateway_client_id: string;
+  gateway_client_secret: string;
 }
 
 export type IntegrationSettingsData = TopdeskSettings | ThreePSettings | GreenValleySettings;

@@ -20,13 +20,13 @@ from mcfw.rpc import returns, arguments
 from plugins.rogerthat_api.api import messaging, system
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 from plugins.rogerthat_api.to import MemberTO
-from plugins.rogerthat_api.to.messaging import AnswerTO, Message
+from plugins.rogerthat_api.to.messaging import AnswerTO, Message, AttachmentTO
 
 
 @returns(unicode)
 @arguments(sik=unicode, member=MemberTO, message=unicode, answers=(None, [AnswerTO]), flags=(int, long),
-           parent_message_key=unicode, json_rpc_id=unicode)
-def send_rogerthat_message(sik, member, message, answers=None, flags=None,
+           attachments=[AttachmentTO], parent_message_key=unicode, json_rpc_id=unicode)
+def send_rogerthat_message(sik, member, message, answers=None, flags=None, attachments=None,
                            parent_message_key=None, json_rpc_id=None):
     rt_settings = RogerthatSettings.create_key(sik).get()
 
@@ -43,6 +43,7 @@ def send_rogerthat_message(sik, member, message, answers=None, flags=None,
                           alert_flags=Message.ALERT_FLAG_VIBRATE,
                           branding=get_main_branding_hash(rt_settings.api_key),
                           tag=None,
+                          attachments=attachments or [],
                           json_rpc_id=json_rpc_id)
 
 

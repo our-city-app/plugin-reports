@@ -11,4 +11,17 @@
     <mat-label>Base url</mat-label>
     <input name="base_url" matInput [(ngModel)]="settings.base_url" (ngModelChange)="changed()">
   </mat-form-field>
+  <mat-form-field>
+    <mat-label>Realm</mat-label>
+    <input name="realm" matInput [(ngModel)]="settings.realm" (ngModelChange)="changed()">
+    <mat-hint>E.g. suite-integration</mat-hint>
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>Gateway client id</mat-label>
+    <input name="gateway_client_id" matInput [(ngModel)]="settings.gateway_client_id" (ngModelChange)="changed()">
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>Gateway client secret</mat-label>
+    <input name="gateway_client_secret" matInput [(ngModel)]="settings.gateway_client_secret" (ngModelChange)="changed()">
+  </mat-form-field>
 </ng-container>
