@@ -42,7 +42,7 @@ from plugins.rogerthat_api.rogerthat_api_plugin import RogerthatApiPlugin
 
 
 class IndexHandler(webapp2.RequestHandler):
-    def get(self):
+    def get(self, *args, **kwargs):
         if get_current_session():
             render_logged_in_page(self)
         else:
