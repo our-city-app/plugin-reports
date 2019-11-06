@@ -64,10 +64,13 @@ def get_reports_map_item_details(ids, user_id, language):
             vote_mapping[model.incident_id] = model
         elif isinstance(model, UserIncidentVote):
             user_vote_mapping[model.incident_id] = model
-    return GetMapItemDetailsResponseTO(items=[
-        convert_to_item_details_to(i, vote_mapping.get(i.id), user_vote_mapping.get(i.id), language)
-        for i in incidents
-    ])
+    items = []
+    for incident in incidents:
+        vote = vote_mapping.get(incident.id)
+        if not vote and incident.can_show_votes:
+            vote = IncidentVote(key=IncidentVote.create_key(incident.id))
+        items.append(convert_to_item_details_to(incident, vote, user_vote_mapping.get(incident.id), language))
+    return GetMapItemDetailsResponseTO(items=items)
 
 
 def vote_report_item(item_id, user_id, vote_id, option_id, language):
