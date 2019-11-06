@@ -75,25 +75,6 @@ def get_reports_map_item_details(ids, user_id, language):
 
 def vote_report_item(item_id, user_id, vote_id, option_id, language):
     # type: (unicode, unicode, unicode, unicode, unicode) -> SaveMapItemVoteResponseTO
-    from_option = None
-    user_vote_key = UserIncidentVote.create_key(user_id, item_id)
-    user_vote = user_vote_key.get()
-    save_vote = True
-    if user_vote:
-        from_option = user_vote.option_id
-        # Pressed same option -> remove vote
-        if from_option == option_id:
-            user_vote_key.delete()
-            user_vote = None
-            save_vote = False
-    else:
-        user_vote = UserIncidentVote(key=user_vote_key)
-    if save_vote:
-        user_vote.incident_id = item_id
-        user_vote.option_id = option_id
-        user_vote.put()
-
-    # todo handle trans collision
-    vote = update_incident_vote(item_id, from_option, option_id)
+    vote, user_vote = update_incident_vote(item_id, user_id, vote_id, option_id)
     options = get_vote_options(vote, user_vote, language)
     return SaveMapItemVoteResponseTO(item_id=item_id, vote_id=vote_id, options=options)

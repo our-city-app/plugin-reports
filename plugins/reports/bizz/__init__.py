@@ -23,14 +23,30 @@ from plugins.reports.to import MapItemDetailsTO, TextSectionTO, VoteSectionTO, \
     MapItemTO, GeoPointTO, MapIconTO, MapVoteOptionTO
 
 
-@ndb.transactional()
-def update_incident_vote(incident_id, from_option_id, to_option_id):
+@ndb.transactional(xg=True)
+def update_incident_vote(incident_id, user_id, vote_id, to_option_id):
     vote_key = IncidentVote.create_key(incident_id)
-    vote = vote_key.get()
+    user_vote_key = UserIncidentVote.create_key(user_id, incident_id)
+    vote, user_vote = ndb.get_multi((vote_key, user_vote_key))
+
+    from_option_id = None
+    save_vote = True
+    if user_vote:
+        from_option_id = user_vote.option_id
+        # Pressed same option -> remove vote
+        if from_option_id == to_option_id:
+            user_vote_key.delete()
+            user_vote = None
+            save_vote = False
+    else:
+        user_vote = UserIncidentVote(key=user_vote_key)
+    if save_vote:
+        user_vote.incident_id = incident_id
+        user_vote.option_id = to_option_id
+        user_vote.put()
+
     if not vote:
         vote = IncidentVote(key=vote_key)
-        vote.negative_count = 0
-        vote.positive_count = 0
 
     changed = False
     if from_option_id == IncidentVote.NEGATIVE:
@@ -52,7 +68,7 @@ def update_incident_vote(incident_id, from_option_id, to_option_id):
     if changed:
         vote.put()
 
-    return vote
+    return vote, user_vote
 
 
 def get_vote_options(vote, user_vote, language):
