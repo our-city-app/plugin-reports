@@ -126,4 +126,5 @@ def create_incident_from_form(integration_id, data):
         raise HttpBadRequestException()
     incident.visible = incident.can_show_on_map
     incident.put()
+    try_or_defer(re_index_incident, incident)
     return incident.id
