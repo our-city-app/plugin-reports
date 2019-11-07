@@ -15,7 +15,6 @@
 #
 # @@license_version:1.5@@
 import logging
-import rfc822
 from datetime import datetime
 from uuid import uuid4
 
@@ -46,11 +45,11 @@ def cleanup_timed_out_query():
     return Incident.list_by_cleanup_date(datetime.utcnow())
 
 
-# TODO what is the use of this? cleanup_date is always None
 @ndb.transactional(xg=True)
 def cleanup_timed_out_worker(incident_keys):
     incidents = ndb.get_multi(incident_keys)  # type: List[Incident]
     for incident in incidents:
+        incident.visible = False
         incident.cleanup_date = None
     re_index_incidents(incidents)
     ndb.put_multi(incidents)
