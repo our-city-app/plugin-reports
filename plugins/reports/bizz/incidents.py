@@ -18,13 +18,14 @@ import logging
 from datetime import datetime
 from uuid import uuid4
 
-from google.appengine.ext import ndb
-
 from dateutil.parser import parse as parse_date
-from framework.bizz.job import run_job, MODE_BATCH
-from framework.utils import try_or_defer
+from google.appengine.ext import ndb
 from mcfw.exceptions import HttpBadRequestException
 from mcfw.rpc import parse_complex_value
+from typing import List, Tuple
+
+from framework.bizz.job import run_job, MODE_BATCH
+from framework.utils import try_or_defer
 from plugins.reports.bizz.elasticsearch import re_index_incidents, re_index_incident
 from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, get_integration_settings
 from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
@@ -34,7 +35,6 @@ from plugins.reports.models import Incident, IntegrationProvider, IncidentParams
     FormIntegration, GreenValleyFormConfiguration, IncidentStatus
 from plugins.reports.to import FormSubmittedCallback
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
-from typing import List, Tuple
 
 
 def cleanup_timed_out():

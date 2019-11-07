@@ -22,12 +22,11 @@ from mimetypes import guess_extension
 
 from google.appengine.api import urlfetch
 from google.appengine.ext.ndb import GeoPt
-
 from lxml import etree
 from mcfw.consts import DEBUG
+
 from plugins.reports.integrations.int_green_valley.attachments import get_attachment_content
-from plugins.reports.models import GreenValleySettings, Incident, IncidentDetails, IncidentStatus, \
-    IntegrationParamsGreenValley
+from plugins.reports.models import GreenValleySettings, Incident, IncidentDetails, IntegrationParamsGreenValley
 from plugins.reports.models.green_valley import GvMappingFlex, GreenValleyFormConfiguration, GvMappingAttachment, \
     GvMappingLocation, GvMappingPerson, GvMappingField, GvMappingConst, GvMappingConsent
 from plugins.reports.to import FormSubmissionTO, FieldComponentTO, DynamicFormTO, TextInputComponentValueTO, \
