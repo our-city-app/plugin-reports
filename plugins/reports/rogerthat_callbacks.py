@@ -18,6 +18,7 @@
 import logging
 
 from mcfw.rpc import parse_complex_value, serialize_complex_value
+
 from plugins.reports.bizz.incidents import process_incident
 from plugins.reports.dal import get_consumer
 from plugins.reports.utils import parse_to_human_readable_tag
@@ -38,7 +39,8 @@ def log_and_parse_user_details(user_details):
     return parse_complex_value(UserDetailsTO, user_details, is_list)
 
 
-def flow_member_result(rt_settings, request_id, tag, parent_message_key, steps, flush_id, user_details, timestamp, **kwargs):
+def flow_member_result(rt_settings, request_id, tag, parent_message_key, steps, flush_id, user_details, timestamp,
+                       **kwargs):
     user_details = log_and_parse_user_details(user_details)
     f = FMR_TAG_MAPPING.get(parse_to_human_readable_tag(tag))
     if f:

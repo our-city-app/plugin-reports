@@ -14,8 +14,9 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
-from framework.to import TO
 from mcfw.properties import typed_property, unicode_property, long_property
+
+from framework.to import TO
 from plugins.reports.models import INTEGRATION_SETTINGS_DATA, IntegrationSettings
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 

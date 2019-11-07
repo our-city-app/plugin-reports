@@ -23,11 +23,11 @@ import time
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
-
 from mcfw.consts import DEBUG
+from typing import Generator, Dict, Iterable, List, Tuple, Union
+
 from plugins.reports.bizz import convert_to_item_to
 from plugins.reports.models import ElasticsearchSettings, Incident
-from typing import Generator, Dict, Iterable, List, Tuple, Union
 
 
 def get_elasticsearch_config():

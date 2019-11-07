@@ -23,10 +23,11 @@ from collections import defaultdict
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import deferred, ndb
+from markdown import markdown
+from typing import List, Dict, Tuple
 
 from framework.plugin_loader import get_config
 from framework.utils import try_or_defer, guid
-from markdown import markdown
 from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import NAMESPACE
@@ -40,7 +41,6 @@ from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO, FlowStepTO
 from plugins.rogerthat_api.to.messaging.forms import Widget, FormTO, OpenIdWidgetResultTO, LocationWidgetResultTO
-from typing import List, Dict, Tuple
 
 SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, Widget.TYPE_DATE_SELECT,
                           Widget.TYPE_RANGE_SLIDER)

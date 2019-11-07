@@ -15,14 +15,14 @@
 #
 # @@license_version:1.5@@
 from google.appengine.ext import ndb
-
 from mcfw.exceptions import HttpNotFoundException
+from typing import List, Tuple
+
 from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident
 from plugins.reports.to import IncidentTO
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 from plugins.rogerthat_api.to import UserDetailsTO
-from typing import List, Tuple
 
 
 def save_integration_settings(integration_id, rogerthat_api_key, name, consumer_id, sik, data):

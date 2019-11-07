@@ -19,8 +19,9 @@
 
 from datetime import datetime
 
-from framework.to import TO
 from mcfw.properties import unicode_property, float_property, long_property, unicode_list_property, typed_property
+
+from framework.to import TO
 from .enums import FormComponentType
 
 

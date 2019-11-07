@@ -18,9 +18,8 @@
 from base64 import b64encode
 from cStringIO import StringIO
 
-from google.appengine.api import urlfetch
-
 from PIL import Image
+from google.appengine.api import urlfetch
 
 
 def _maybe_resize_image(image, content_type):

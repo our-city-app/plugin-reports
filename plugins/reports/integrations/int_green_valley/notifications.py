@@ -23,22 +23,22 @@ from base64 import b64encode, b64decode
 import webapp2
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
+from html2text import HTML2Text
+from mcfw.cache import cached
+from mcfw.properties import unicode_property, long_property, typed_property
+from mcfw.rpc import arguments, returns
+from typing import List
 
 from framework.bizz.job import run_job
 from framework.to import TO
 from framework.utils import get_server_url
 from framework.utils import try_or_defer, guid, convert_to_str
-from html2text import HTML2Text
-from mcfw.cache import cached
-from mcfw.properties import unicode_property, long_property, typed_property
-from mcfw.rpc import arguments, returns
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.dal import get_rogerthat_user
 from plugins.reports.models import GreenValleySettings, Incident, IntegrationSettings, IntegrationProvider, \
     IntegrationParamsGreenValley
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging import AttachmentTO
-from typing import List
 
 
 class GVExternalNotificationAttachment(TO):

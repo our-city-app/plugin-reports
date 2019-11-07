@@ -16,11 +16,12 @@
 # @@license_version:1.5@@
 import logging
 
-from framework.bizz.authentication import get_browser_language
-from framework.plugin_loader import get_config
 from mcfw.exceptions import HttpBadRequestException
 from mcfw.restapi import rest
 from mcfw.rpc import returns, arguments
+
+from framework.bizz.authentication import get_browser_language
+from framework.plugin_loader import get_config
 from plugins.reports.bizz.map import get_report_map_items, get_reports_map_item_details, vote_report_item
 from plugins.reports.consts import NAMESPACE
 from plugins.reports.to import GetMapItemsResponseTO, GetMapItemDetailsResponseTO, ItemVoteTO, SaveMapItemVoteResponseTO

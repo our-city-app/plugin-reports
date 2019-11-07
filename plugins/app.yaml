@@ -1,7 +1,7 @@
 automatic_scaling:
   min_idle_instances: 0
 inbound_services:
-- mail
+  - mail
 libraries:
   - name: PIL
     version: 1.1.7

@@ -17,12 +17,13 @@
 
 import logging
 
+import dicttoxml
 from google.appengine.api import app_identity
 from google.appengine.ext import deferred, ndb
-
-import dicttoxml
-from framework.utils import guid, try_or_defer
 from mcfw.consts import DEBUG
+from typing import Tuple
+
+from framework.utils import guid, try_or_defer
 from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.bizz.gcs import is_file_available, upload_to_gcs
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
@@ -32,7 +33,6 @@ from plugins.reports.models import RogerthatUser, Incident, IncidentDetails, Thr
     IncidentStatus, IncidentParamsFlow
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO
-from typing import Tuple
 
 
 def create_incident(settings, rt_user, incident, steps):

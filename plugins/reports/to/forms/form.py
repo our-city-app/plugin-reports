@@ -16,8 +16,9 @@
 # limitations under the License.
 #
 # @@license_version:1.6@@
-from framework.to import TO
 from mcfw.properties import long_property, unicode_property, typed_property, object_factory, bool_property
+
+from framework.to import TO
 from .component_values import FORM_COMPONENT_VALUES
 from .components import FormComponentTO, NextActionTO
 

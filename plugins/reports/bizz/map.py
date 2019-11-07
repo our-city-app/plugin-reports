@@ -17,12 +17,12 @@
 import logging
 
 from google.appengine.ext import ndb
+from typing import List
 
 from plugins.reports.bizz import update_incident_vote, get_vote_options, convert_to_item_details_to
 from plugins.reports.bizz.elasticsearch import search_current
 from plugins.reports.models import Incident, UserIncidentVote, IncidentStatus, ReportsFilter, IncidentVote
 from plugins.reports.to import GetMapItemsResponseTO, GetMapItemDetailsResponseTO, SaveMapItemVoteResponseTO
-from typing import List
 
 
 def convert_filter_to_status(filter_value):
@@ -55,7 +55,8 @@ def get_reports_map_item_details(ids, user_id, language):
         return GetMapItemDetailsResponseTO()
     incidents = ndb.get_multi([Incident.create_key(uid) for uid in ids])  # type: List[Incident]
     extra_keys = [IncidentVote.create_key(incident.id) for incident in incidents if incident.can_show_votes] + \
-                 [UserIncidentVote.create_key(user_id, incident.id) for incident in incidents if incident.can_show_votes]
+                 [UserIncidentVote.create_key(user_id, incident.id) for incident in incidents if
+                  incident.can_show_votes]
     extra_models = ndb.get_multi(extra_keys)
     vote_mapping = {}
     user_vote_mapping = {}

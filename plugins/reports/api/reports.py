@@ -18,6 +18,7 @@
 from mcfw.exceptions import HttpForbiddenException, HttpNotFoundException, HttpBadRequestException
 from mcfw.restapi import rest, GenericRESTRequestHandler
 from mcfw.rpc import returns, arguments
+
 from plugins.reports.bizz.incidents import list_incidents, create_incident_from_form
 from plugins.reports.dal import get_consumer, get_incident, update_incident
 from plugins.reports.models import FormIntegration, SaveFormIntegrationTO, IncidentStatus

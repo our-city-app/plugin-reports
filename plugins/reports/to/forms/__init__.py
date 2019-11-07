@@ -17,8 +17,8 @@
 #
 # @@license_version:1.6@@
 
-from components import *
 from component_values import *
+from components import *
 from enums import *
 from form import *
 from validators import *

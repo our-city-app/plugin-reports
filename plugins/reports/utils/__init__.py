@@ -19,6 +19,7 @@ import json
 import re
 
 from mcfw.rpc import returns, arguments
+
 from plugins.rogerthat_api.to.messaging.flow import BaseFlowStepTO
 
 HUMAN_READABLE_TAG_REGEX = re.compile('(.*?)\\s*\\{.*\\}')

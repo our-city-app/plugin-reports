@@ -16,8 +16,9 @@
 # limitations under the License.
 #
 # @@license_version:1.6@@
-from framework.to import TO
 from mcfw.properties import object_factory, long_property, unicode_property
+
+from framework.to import TO
 from .component_values import DatetimeValueTO
 
 

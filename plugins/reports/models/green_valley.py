@@ -15,8 +15,10 @@
 #
 # @@license_version:1.5@@
 from __future__ import unicode_literals
-from framework.to import TO
+
 from mcfw.properties import unicode_property, object_factory, typed_property
+
+from framework.to import TO
 
 
 class GvFieldType(object):

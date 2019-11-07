@@ -18,13 +18,13 @@ from __future__ import unicode_literals
 
 from datetime import datetime
 
-from google.appengine.ext import ndb
-
 from dateutil.relativedelta import relativedelta
-from framework.models.common import NdbModel, TOProperty
-from framework.to import TO
+from google.appengine.ext import ndb
 from mcfw.properties import unicode_property, object_factory, unicode_list_property, long_property, bool_property, \
     typed_property
+
+from framework.models.common import NdbModel, TOProperty
+from framework.to import TO
 from plugins.reports.consts import NAMESPACE
 from plugins.reports.models.green_valley import GreenValleyFormConfiguration
 from plugins.rogerthat_api.plugin_utils import Enum

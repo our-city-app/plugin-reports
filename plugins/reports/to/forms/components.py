@@ -19,9 +19,10 @@
 
 from __future__ import unicode_literals
 
-from framework.to import TO
 from mcfw.properties import typed_property, unicode_property, unicode_list_property, object_factory, \
     bool_property
+
+from framework.to import TO
 from .enums import FormComponentType, DateFormat, KeyboardType
 from .validators import FormValidatorTO, FormValidatorType
 
