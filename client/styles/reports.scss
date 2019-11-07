@@ -1,4 +1,19 @@
-@import '~@angular/material/prebuilt-themes/deeppurple-amber.css';
+@import '~@angular/material/theming';
+
+@include mat-core();
+
+$app-primary: mat-palette($mat-indigo);
+$app-accent: mat-palette($mat-purple, A200, A100, A400);
+$app-warn: mat-palette($mat-red);
+$light-theme: mat-light-theme($app-primary, $app-accent, $app-warn);
+@include angular-material-theme($light-theme);
+
+$dark-warn: mat-palette($mat-deep-orange);
+$dark-theme: mat-dark-theme($app-primary, $app-accent, $dark-warn);
+
+@media (prefers-color-scheme: dark) {
+  @include angular-material-theme($dark-theme);
+}
 
 .r-fab-bottom-right {
   position: fixed;

@@ -113,8 +113,7 @@ def get_incident_by_external_id(integration_id, external_id):
 
 def update_incident(incident, data):
     # type: (Incident, IncidentTO) -> Incident
-    if incident.status != data.status:
-        incident.set_status(data.status)
+    incident.set_status(data.status)
     incident.visible = data.visible if incident.can_show_on_map else False
     incident.put()
     re_index_incident(incident)

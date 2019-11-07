@@ -331,6 +331,8 @@ class Incident(NdbModel):
             .order(-cls.report_date)
 
     def set_status(self, status):
+        if self.status == status:
+            return
         self.status = status
         self.status_dates.append(IncidentStatusDate(date=datetime.now(), status=status))
         if self.status == IncidentStatus.RESOLVED:
