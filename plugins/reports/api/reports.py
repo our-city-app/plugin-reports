@@ -15,12 +15,12 @@
 #
 # @@license_version:1.5@@
 
-from mcfw.exceptions import HttpForbiddenException, HttpNotFoundException
+from mcfw.exceptions import HttpForbiddenException, HttpNotFoundException, HttpBadRequestException
 from mcfw.restapi import rest, GenericRESTRequestHandler
 from mcfw.rpc import returns, arguments
 from plugins.reports.bizz.incidents import list_incidents, create_incident_from_form
 from plugins.reports.dal import get_consumer, get_incident, update_incident
-from plugins.reports.models import FormIntegration, SaveFormIntegrationTO
+from plugins.reports.models import FormIntegration, SaveFormIntegrationTO, IncidentStatus
 from plugins.reports.to import IncidentListTO, IncidentTO, FormSubmittedCallback
 
 
@@ -59,10 +59,12 @@ def api_save_form_settings(data):
 
 @rest('/incidents', 'get', silent_result=True)
 @returns(IncidentListTO)
-@arguments()
-def api_get_incidents():
+@arguments(status=unicode, cursor=unicode)
+def api_get_incidents(status=None, cursor=None):
     consumer = _get_consumer()
-    results, cursor, more = list_incidents(consumer.integration_id, 50)
+    if status not in IncidentStatus.all():
+        raise HttpBadRequestException('Invalid status', {'allowed_statuses': IncidentStatus.all()})
+    results, cursor, more = list_incidents(consumer.integration_id, 50, status=status, cursor=cursor)
     return IncidentListTO(cursor and cursor.to_websafe_string(), more, [IncidentTO.from_model(i) for i in results])
 
 

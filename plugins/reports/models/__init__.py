@@ -14,10 +14,13 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from __future__ import unicode_literals
+
 from datetime import datetime
 
 from google.appengine.ext import ndb
 
+from dateutil.relativedelta import relativedelta
 from framework.models.common import NdbModel, TOProperty
 from framework.to import TO
 from mcfw.properties import unicode_property, object_factory, unicode_list_property, long_property, bool_property, \
@@ -260,7 +263,6 @@ class ReportsFilter(Enum):
 
 
 class IncidentDetails(NdbModel):
-    status = ndb.StringProperty(indexed=False, choices=IncidentStatus.all())
     title = ndb.StringProperty(indexed=False)
     description = ndb.TextProperty(indexed=False)
     geo_location = ndb.GeoPtProperty(indexed=False)
@@ -288,6 +290,7 @@ class Incident(NdbModel):
     params = TOProperty(IncidentParams())  # type: IncidentParams
     integration_params = TOProperty(IntegrationParams())  # type: IntegrationParams
     external_id = ndb.StringProperty()
+    status = ndb.StringProperty(choices=IncidentStatus.all())
     details = ndb.LocalStructuredProperty(IncidentDetails)  # type: IncidentDetails
 
     @property
@@ -300,7 +303,7 @@ class Incident(NdbModel):
 
     @property
     def can_show_votes(self):
-        return self.details.status in (IncidentStatus.NEW, IncidentStatus.IN_PROGRESS)
+        return self.status in (IncidentStatus.NEW, IncidentStatus.IN_PROGRESS)
 
     @classmethod
     def create_key(cls, incident_id):
@@ -321,12 +324,19 @@ class Incident(NdbModel):
             .order(cls.cleanup_date, cls.key)
 
     @classmethod
-    def list_by_integration_id(cls, integration_id):
-        return cls.query().filter(cls.integration_id == integration_id).order(-cls.report_date)
+    def list_by_integration_id_and_status(cls, integration_id, status):
+        return cls.query() \
+            .filter(cls.integration_id == integration_id) \
+            .filter(cls.status == status) \
+            .order(-cls.report_date)
 
     def set_status(self, status):
-        self.details.status = status
+        self.status = status
         self.status_dates.append(IncidentStatusDate(date=datetime.now(), status=status))
+        if self.status == IncidentStatus.RESOLVED:
+            self.cleanup_date = datetime.now() + relativedelta(months=1)
+        else:
+            self.cleanup_date = None
 
 
 class FormIntegration(NdbModel):

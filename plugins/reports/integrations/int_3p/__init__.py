@@ -144,7 +144,7 @@ def create_incident_xml(incident, rt_user, steps):
     }
     xml = dicttoxml.dicttoxml(work_order, custom_root='Workorder', attr_type=False)
     prettyxml = dicttoxml.parseString(xml).toprettyxml(encoding='utf8')
-    details = IncidentDetails(status=IncidentStatus.NEW)
+    details = IncidentDetails()
     details.title = incident_type
     details.description = '\n'.join(description) if description else None
     if latitude and longitude:
@@ -173,7 +173,7 @@ def incident_follow_up(from_, regex, subject, body):
         return
     rt_user = get_rogerthat_user(incident.user_id)
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
-    if incident.details.status == IncidentStatus.NEW:
+    if incident.status == IncidentStatus.NEW:
         incident.set_status(IncidentStatus.IN_PROGRESS)
         incident.put()
         try_or_defer(re_index_incident, incident)

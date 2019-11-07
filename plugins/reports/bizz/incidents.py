@@ -32,7 +32,7 @@ from plugins.reports.integrations.int_3p import create_incident as create_3p_inc
 from plugins.reports.integrations.int_green_valley.green_valley import create_incident as create_gv_incident
 from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
 from plugins.reports.models import Incident, IntegrationProvider, IncidentParamsFlow, IncidentParamsForm, \
-    FormIntegration, GreenValleyFormConfiguration
+    FormIntegration, GreenValleyFormConfiguration, IncidentStatus
 from plugins.reports.to import FormSubmittedCallback
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
 from typing import List, Tuple
@@ -73,6 +73,7 @@ def _create_incident(incident_id, integration_id, user_id, parent_message_key, t
     parsed_steps = parse_complex_value(FLOW_STEP_TO, steps, True)
 
     incident = Incident(key=Incident.create_key(incident_id))
+    incident.status = IncidentStatus.NEW
     incident.integration_id = settings.id
     incident.user_id = user_id
     incident.report_date = datetime.utcfromtimestamp(timestamp)
@@ -95,9 +96,9 @@ def _create_incident(incident_id, integration_id, user_id, parent_message_key, t
     try_or_defer(re_index_incident, incident)
 
 
-def list_incidents(integration_id, page_size, cursor=None):
-    # type: (int, int, str) -> Tuple[List[Incident], ndb.Cursor, bool]
-    return Incident.list_by_integration_id(integration_id).fetch_page(page_size, start_cursor=cursor)
+def list_incidents(integration_id, page_size, status, cursor=None):
+    # type: (int, int, str, str) -> Tuple[List[Incident], ndb.Cursor, bool]
+    return Incident.list_by_integration_id_and_status(integration_id, status).fetch_page(page_size, start_cursor=cursor)
 
 
 def create_incident_from_form(integration_id, data):
@@ -109,6 +110,7 @@ def create_incident_from_form(integration_id, data):
         raise HttpBadRequestException('Could not find integration settings for %s' % integration_id)
     date = parse_date(data.submission.submitted_date).replace(tzinfo=None)
     incident = Incident(key=Incident.create_key(str(uuid4())))
+    incident.status = IncidentStatus.NEW
     incident.integration_id = integration_id
     incident.user_id = rt_user.user_id
     incident.report_date = date

@@ -120,7 +120,7 @@ def _index_incident(incident):
                 'lat': incident.details.geo_location.lat,
                 'lon': incident.details.geo_location.lon
             },
-            'status': incident.details.status
+            'status': incident.status
         }
         return index_doc_operations(incident.id, doc)
     else:

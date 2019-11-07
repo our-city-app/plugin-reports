@@ -45,7 +45,7 @@ def save_integration_settings(integration_id, rogerthat_api_key, name, consumer_
 
     consumer = Consumer(key=Consumer.create_key(sik))
     consumer.ref = name
-    consumer.integration_id = integration_id
+    consumer.integration_id = settings.id
 
     settings.data = data
     ndb.put_multi([settings, rogerthat_settings, consumer])
@@ -113,8 +113,8 @@ def get_incident_by_external_id(integration_id, external_id):
 
 def update_incident(incident, data):
     # type: (Incident, IncidentTO) -> Incident
-    if incident.details.status != data.details.status:
-        incident.set_status(data.details.status)
+    if incident.status != data.status:
+        incident.set_status(data.status)
     incident.visible = data.visible if incident.can_show_on_map else False
     incident.put()
     re_index_incident(incident)

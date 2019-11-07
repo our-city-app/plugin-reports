@@ -6,5 +6,6 @@ indexes:
   - kind: Incident
     properties:
       - name: integration_id
+      - name: status
       - name: report_date
         direction: desc

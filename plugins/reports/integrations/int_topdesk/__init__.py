@@ -63,7 +63,7 @@ def create_incident(config, rt_user, incident, steps):
 
     brief_description = 'Nieuwe melding'
 
-    incident_details = IncidentDetails(status=IncidentStatus.NEW)
+    incident_details = IncidentDetails()
 
     data = {
         TopdeskPropertyName.CALL_TYPE: {
@@ -299,7 +299,7 @@ def incident_feedback(integration_id, incident_id, message):
     updated = True
     if response['closed']:
         incident.set_status(IncidentStatus.RESOLVED)
-    elif incident.details.status == IncidentStatus.NEW:
+    elif incident.status == IncidentStatus.NEW:
         incident.set_status(IncidentStatus.IN_PROGRESS)
     else:
         updated = False

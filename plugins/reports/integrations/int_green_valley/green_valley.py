@@ -175,7 +175,6 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
         'reference': incident.id,
     }
     details = IncidentDetails()
-    details.status = IncidentStatus.NEW
     desc = IncidentDescription()
     user_consent = False
 

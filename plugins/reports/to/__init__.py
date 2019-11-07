@@ -179,7 +179,6 @@ class LatLonTO(TO):
 
 
 class IncidentDetailsTO(TO):
-    status = unicode_property('status')
     title = unicode_property('title')
     description = unicode_property('description')
     geo_location = typed_property('geo_location', LatLonTO)
@@ -197,6 +196,7 @@ class IncidentTO(TO):
     # params = typed_property('params', IncidentParams())
     # integration_params = typed_property('incident_params', IntegrationParams())
     external_id = unicode_property('external_id')
+    status = unicode_property('status')
     details = typed_property('details', IncidentDetailsTO)  # type: IncidentDetailsTO
 
 
