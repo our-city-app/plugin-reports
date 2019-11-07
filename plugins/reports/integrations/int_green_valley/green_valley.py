@@ -161,7 +161,7 @@ def choices_to_markdown(comp_val, component):
 
 
 def create_incident(gv_settings, form_configuration, submission, form, incident):
-    # type: (GreenValleySettings, GreenValleyFormConfiguration, FormSubmissionTO, DynamicFormTO, Incident) -> None
+    # type: (GreenValleySettings, GreenValleyFormConfiguration, FormSubmissionTO, DynamicFormTO, Incident) -> bool
     original_form_mapping = {section.id: {component.id: component for component in section.components if
                                           isinstance(component, FieldComponentTO)}
                              for section in form.sections}
@@ -267,7 +267,7 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
 
     if not request.get('description') and not person:
         logging.info('Not creating case: not enough information')
-        return
+        return False
 
     property_order = [
         'type_id',
@@ -317,3 +317,4 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
     incident.external_id = etree.XML(result).get('id')
     incident.user_consent = user_consent
     incident.integration_params = IntegrationParamsGreenValley(notification_ids=[])
+    return True

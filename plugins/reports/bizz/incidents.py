@@ -122,10 +122,12 @@ def create_incident_from_form(integration_id, data):
 
     integration = get_integration_settings(integration_id)
     if isinstance(form_configuration.config, GreenValleyFormConfiguration):
-        create_gv_incident(integration.data, form_configuration.config, data.submission, data.form, incident)
+        created = create_gv_incident(integration.data, form_configuration.config, data.submission, data.form, incident)
     else:
         raise HttpBadRequestException()
-    incident.visible = incident.can_show_on_map
-    incident.put()
-    try_or_defer(re_index_incident, incident)
-    return incident.id
+    if created:
+        incident.visible = incident.can_show_on_map
+        incident.put()
+        try_or_defer(re_index_incident, incident)
+        return incident.id
+    return None

@@ -340,6 +340,10 @@ class Incident(NdbModel):
         else:
             self.cleanup_date = None
 
+    @classmethod
+    def list_by_integration_id(cls, integration_id):
+        return cls.query().filter(cls.integration_id == integration_id)
+
 
 class FormIntegration(NdbModel):
     NAMESPACE = NAMESPACE
