@@ -18,9 +18,15 @@
 from google.appengine.ext import ndb
 
 from framework.i18n_utils import translate
-from plugins.reports.models import IncidentVote, UserIncidentVote, Incident
+from plugins.reports.models import IncidentVote, UserIncidentVote, Incident, IncidentStatus
 from plugins.reports.to import MapItemDetailsTO, TextSectionTO, VoteSectionTO, \
     MapItemTO, GeoPointTO, MapIconTO, MapVoteOptionTO
+
+ICON_MAPPING = {
+    IncidentStatus.NEW: ('new', '#f10812'),
+    IncidentStatus.IN_PROGRESS: ('inprogress', '#eeb309'),
+    IncidentStatus.RESOLVED: ('resolved', '#a4c14d'),
+}
 
 
 @ndb.transactional(xg=True)
@@ -92,19 +98,17 @@ def get_vote_options(vote, user_vote, language):
     ]
 
 
-def convert_to_item_to(m):
+def convert_to_item_to(incident):
     # type: (Incident) -> MapItemTO
-    # TODO: proper icon
-    icon_id = 'other'
-    icon_color = '#263583'
+    icon_id, icon_color = ICON_MAPPING.get(incident.status, IncidentStatus.NEW)
 
-    return MapItemTO(id=m.id,
-                     coords=GeoPointTO(lat=m.details.geo_location.lat,
-                                       lon=m.details.geo_location.lon),
+    return MapItemTO(id=incident.id,
+                     coords=GeoPointTO(lat=incident.details.geo_location.lat,
+                                       lon=incident.details.geo_location.lon),
                      icon=MapIconTO(id=icon_id,
                                     color=icon_color),
-                     title=m.details.title,
-                     description=m.details.description)
+                     title=incident.details.title,
+                     description=incident.details.description)
 
 
 def convert_to_item_details_to(incident, vote, user_vote, language):
