@@ -23,6 +23,7 @@ from base64 import b64encode, b64decode
 import webapp2
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
+from google.appengine.ext.deferred import PermanentTaskFailure
 from html2text import HTML2Text
 from mcfw.cache import cached
 from mcfw.properties import unicode_property, long_property, typed_property
@@ -79,7 +80,8 @@ def _get_token(realm, client_id, client_secret):
     if response.status_code == 200:
         return json.loads(response.content)
     else:
-        logging.debug('%s: %s', response.status_code, response.content)
+        logging.debug('Request: %s\nHeaders:%s', url, headers)
+        logging.debug('Response: %s: %s', response.status_code, response.content)
         raise Exception('Invalid response from %s' % url)
 
 
@@ -96,7 +98,8 @@ def _request(settings, path, method=urlfetch.GET, params=None):
     if response.status_code == 200:
         return json.loads(response.content)
     else:
-        logging.debug('%s: %s', response.status_code, response.content)
+        logging.debug('Request: %s\nHeaders:%s\nPayload:%s', url, headers, payload)
+        logging.debug('Response: %s: %s', response.status_code, response.content)
         raise Exception('Invalid response from %s' % url)
 
 
@@ -121,7 +124,11 @@ def check_for_new_notifications(incident_key, integration_id):
         return
     notifications = get_notifications(settings.data, incident.external_id)
     if isinstance(incident.integration_params, IntegrationParamsGreenValley):
-        new_notifications = [n for n in notifications if n.id not in incident.integration_params.notification_ids]
+        try:
+            new_notifications = [n for n in notifications if n.id not in incident.integration_params.notification_ids]
+        except Exception as e:
+            logging.exception('Could not fetch notifications')
+            raise PermanentTaskFailure(e.message)
         try_or_defer(_send_notification, new_notifications, incident_key, integration_id)
     else:
         raise Exception('Invalid integration params for incident %s' % incident.id)
