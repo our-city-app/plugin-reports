@@ -122,16 +122,15 @@ def check_for_new_notifications(incident_key, integration_id):
     if not incident.external_id:
         logging.info('Skipping incident %s, external id not set', incident.id)
         return
-    notifications = get_notifications(settings.data, incident.external_id)
+    try:
+        notifications = get_notifications(settings.data, incident.external_id)
+    except Exception as e:
+        logging.exception('Could not fetch notifications')
+        raise PermanentTaskFailure(e.message)
     if isinstance(incident.integration_params, IntegrationParamsGreenValley):
-        try:
-            new_notifications = [n for n in notifications if n.id not in incident.integration_params.notification_ids]
-        except Exception as e:
-            logging.exception('Could not fetch notifications')
-            raise PermanentTaskFailure(e.message)
+        new_notifications = [n for n in notifications if n.id not in incident.integration_params.notification_ids]
         try_or_defer(_send_notification, new_notifications, incident_key, integration_id)
-    else:
-        raise Exception('Invalid integration params for incident %s' % incident.id)
+    raise Exception('Invalid integration params for incident %s' % incident.id)
 
 
 @ndb.transactional(xg=True)
