@@ -9,3 +9,9 @@ indexes:
       - name: status
       - name: report_date
         direction: desc
+  - kind: Incident
+    properties:
+      - name: app_id
+      - name: status
+      - name: status_date
+        direction: desc

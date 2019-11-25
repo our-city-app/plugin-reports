@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+
 from __future__ import unicode_literals
 
 from datetime import datetime
@@ -276,8 +277,10 @@ class IncidentStatusDate(NdbModel):
 class Incident(NdbModel):
     NAMESPACE = NAMESPACE
 
+    app_id = ndb.StringProperty()
     user_id = ndb.StringProperty()
     report_date = ndb.DateTimeProperty()
+    status_date = ndb.DateTimeProperty()
     status_dates = ndb.StructuredProperty(IncidentStatusDate, repeated=True)
 
     # If user has given consent for this incident to be public
@@ -330,13 +333,23 @@ class Incident(NdbModel):
             .filter(cls.status == status) \
             .order(-cls.report_date)
 
+    @classmethod
+    def list_by_app_status_and_date(cls, app_id, status, from_date, to_date):
+        return cls.query() \
+            .filter(cls.app_id == app_id) \
+            .filter(cls.status == status) \
+            .filter(cls.status_date > from_date) \
+            .filter(cls.status_date < to_date) \
+
     def set_status(self, status):
         if self.status == status:
             return
+        now_ = datetime.now()
         self.status = status
-        self.status_dates.append(IncidentStatusDate(date=datetime.now(), status=status))
+        self.status_date = now_
+        self.status_dates.append(IncidentStatusDate(date=now_, status=status))
         if self.status == IncidentStatus.RESOLVED:
-            self.cleanup_date = datetime.now() + relativedelta(months=1)
+            self.cleanup_date = now_ + relativedelta(months=1)
         else:
             self.cleanup_date = None
 
@@ -391,3 +404,61 @@ class UserIncidentVote(NdbModel):
     @classmethod
     def create_key(cls, user_id, incident_id):
         return ndb.Key(cls, incident_id, parent=cls.create_parent_key(user_id))
+
+
+class UserIncidentAnnouncement(NdbModel):
+    NAMESPACE = NAMESPACE
+    
+    created = ndb.DateTimeProperty(auto_now_add=True)
+    
+    @classmethod
+    def create_parent_key(cls, user_id):
+        return ndb.Key(cls, user_id, namespace=cls.NAMESPACE)
+    
+    @classmethod
+    def create_key(cls, user_id, year, month):
+        return ndb.Key(cls, u'%s-%02d' % (year, month), parent=cls.create_parent_key(user_id))
+    
+
+class AppSettings(NdbModel):
+    NAMESPACE = NAMESPACE
+    
+    @property
+    def app_id(self):
+        return self.key.id().decode('utf8')
+    
+    @classmethod
+    def create_key(cls, app_id):
+        return ndb.Key(cls, app_id, namespace=NAMESPACE)
+
+    
+class IncidentStatisticsYear(NdbModel):
+    NAMESPACE = NAMESPACE
+    
+    app_id = ndb.StringProperty(indexed=True)
+    year = ndb.IntegerProperty(indexed=True)
+    resolved_count = ndb.IntegerProperty(indexed=False)
+    
+    @classmethod
+    def create_key(cls, app_id, year):
+        return ndb.Key(cls, u'%s-%s' % (app_id, year), namespace=NAMESPACE)
+    
+    
+class IncidentStatisticsMonth(NdbModel):
+    NAMESPACE = NAMESPACE
+    
+    app_id = ndb.StringProperty(indexed=True)
+    year = ndb.IntegerProperty(indexed=True)
+    month = ndb.IntegerProperty(indexed=True)
+    resolved_count = ndb.IntegerProperty(indexed=False)
+    
+    @classmethod
+    def create_key(cls, app_id, year, month):
+        return ndb.Key(cls, u'%s-%s-%02d' % (app_id, year, month), namespace=NAMESPACE)
+    
+    @classmethod
+    def list_by_app_and_year(cls, app_id, year):
+        return cls.query() \
+            .filter(cls.app_id == app_id) \
+            .filter(cls.year == year)
+    

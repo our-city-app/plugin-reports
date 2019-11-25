@@ -14,18 +14,20 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
-import logging
+
 from datetime import datetime
+import logging
 from uuid import uuid4
 
 from dateutil.parser import parse as parse_date
 from google.appengine.ext import ndb
-from mcfw.exceptions import HttpBadRequestException
-from mcfw.rpc import parse_complex_value
 from typing import List, Tuple
 
 from framework.bizz.job import run_job, MODE_BATCH
 from framework.utils import try_or_defer
+from mcfw.exceptions import HttpBadRequestException
+from mcfw.rpc import parse_complex_value
+from plugins.reports.bizz import save_app_id
 from plugins.reports.bizz.elasticsearch import re_index_incidents, re_index_incident
 from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, get_integration_settings
 from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
@@ -59,6 +61,7 @@ def process_incident(integration_id, user_details, parent_message_key, steps, ti
     rt_user = save_rogerthat_user(user_details[0])
     incident_id = str(uuid4())
     try_or_defer(_create_incident, incident_id, integration_id, rt_user.user_id, parent_message_key, timestamp, steps)
+    try_or_defer(save_app_id, rt_user.app_id)
 
 
 def _create_incident(incident_id, integration_id, user_id, parent_message_key, timestamp, steps):
@@ -72,8 +75,9 @@ def _create_incident(incident_id, integration_id, user_id, parent_message_key, t
     parsed_steps = parse_complex_value(FLOW_STEP_TO, steps, True)
 
     incident = Incident(key=Incident.create_key(incident_id))
-    incident.status = IncidentStatus.NEW
+    incident.set_status(IncidentStatus.NEW)
     incident.integration_id = settings.id
+    incident.app_id = rt_user.app_id
     incident.user_id = user_id
     incident.report_date = datetime.utcfromtimestamp(timestamp)
     incident.cleanup_date = None
@@ -109,8 +113,9 @@ def create_incident_from_form(integration_id, data):
         raise HttpBadRequestException('Could not find integration settings for %s' % integration_id)
     date = parse_date(data.submission.submitted_date).replace(tzinfo=None)
     incident = Incident(key=Incident.create_key(str(uuid4())))
-    incident.status = IncidentStatus.NEW
+    incident.set_status(IncidentStatus.NEW)
     incident.integration_id = integration_id
+    incident.app_id = rt_user.app_id
     incident.user_id = rt_user.user_id
     incident.report_date = date
     incident.cleanup_date = None

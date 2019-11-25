@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+
+from datetime import date
 import logging
 
 from google.appengine.ext import ndb
@@ -21,8 +23,11 @@ from typing import List
 
 from plugins.reports.bizz import update_incident_vote, get_vote_options, convert_to_item_details_to
 from plugins.reports.bizz.elasticsearch import search_current
-from plugins.reports.models import Incident, UserIncidentVote, IncidentStatus, ReportsFilter, IncidentVote
-from plugins.reports.to import GetMapItemsResponseTO, GetMapItemDetailsResponseTO, SaveMapItemVoteResponseTO
+from plugins.reports.models import Incident, UserIncidentVote, IncidentStatus, ReportsFilter, IncidentVote, \
+    IncidentStatisticsYear, UserIncidentAnnouncement
+from plugins.reports.to import GetMapItemsResponseTO, GetMapItemDetailsResponseTO, SaveMapItemVoteResponseTO, \
+    TextSectionTO, TextAnnouncementTO
+from plugins.reports.utils import get_app_id_from_user_id
 
 
 def convert_filter_to_status(filter_value):
@@ -36,8 +41,28 @@ def convert_filter_to_status(filter_value):
     return mapping.get(filter_value, IncidentStatus.NEW)
 
 
-def get_report_map_items(lat, lon, distance, status, limit, cursor):
-    # type: (float, float, int, str, int, str) -> GetMapItemsResponseTO
+def get_report_map_announcement(user_id):
+    today = date.today()
+    user_incident_announcement_key = UserIncidentAnnouncement.create_key(user_id, today.year, today.month)
+    if user_incident_announcement_key.get():
+        return None
+    
+    UserIncidentAnnouncement(key=user_incident_announcement_key).put()
+    
+    app_id = get_app_id_from_user_id(user_id)
+    s = IncidentStatisticsYear.create_key(app_id, today.year).get()
+    if not s:
+        return None
+    if s.resolved_count == 0:
+        return None
+    # todo translate
+    return TextAnnouncementTO(title=u'Opgeloste meldingen',
+                              description=u'Dit jaar zijn er al %s meldingen opgelost.' % s.resolved_count)
+    
+
+
+def get_report_map_items(user_id, lat, lon, distance, status, limit, cursor):
+    # type: (str, float, float, int, str, int, str) -> GetMapItemsResponseTO
     if lat and lon and distance and status and limit:
         if limit > 1000:
             limit = 1000
@@ -46,10 +71,16 @@ def get_report_map_items(lat, lon, distance, status, limit, cursor):
         return GetMapItemsResponseTO()
     status = convert_filter_to_status(status)
     items, new_cursor = search_current(lat, lon, distance, status, cursor, limit)
-    return GetMapItemsResponseTO(cursor=new_cursor, items=items, distance=distance)
+    top_sections = []
+    if status == IncidentStatus.RESOLVED and cursor is None:
+        top_sections = get_top_sections_resolved(user_id)
+    return GetMapItemsResponseTO(cursor=new_cursor,
+                                 items=items,
+                                 distance=distance,
+                                 top_sections=top_sections)
 
 
-def get_reports_map_item_details(ids, user_id, language):
+def get_reports_map_item_details(user_id, ids, language):
     # type: (list[unicode], unicode, unicode) -> GetMapItemDetailsResponseTO
     if not ids or not user_id:
         return GetMapItemDetailsResponseTO()
@@ -79,3 +110,16 @@ def vote_report_item(item_id, user_id, vote_id, option_id, language):
     vote, user_vote = update_incident_vote(item_id, user_id, vote_id, option_id)
     options = get_vote_options(vote, user_vote, language)
     return SaveMapItemVoteResponseTO(item_id=item_id, vote_id=vote_id, options=options)
+
+
+def get_top_sections_resolved(user_id):
+    app_id = get_app_id_from_user_id(user_id)
+    s = IncidentStatisticsYear.create_key(app_id, date.today().year).get()
+    if not s:
+        return []
+    if s.resolved_count == 0:
+        return []
+    # todo translate
+    return [TextSectionTO(title=u'Opgeloste meldingen',
+                          description=u'Dit jaar zijn er al %s meldingen opgelost.' % s.resolved_count)]
+

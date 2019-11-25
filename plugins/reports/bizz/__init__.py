@@ -15,12 +15,20 @@
 #
 # @@license_version:1.5@@
 
-from google.appengine.ext import ndb
+from datetime import datetime, date
 
+from dateutil.relativedelta import relativedelta
+from google.appengine.ext import ndb, deferred
+
+from framework.bizz.job import run_job
 from framework.i18n_utils import translate
-from plugins.reports.models import IncidentVote, UserIncidentVote, Incident, IncidentStatus
+from mcfw.rpc import returns, arguments
+from plugins.reports.models import IncidentVote, UserIncidentVote, Incident, IncidentStatus, \
+    IncidentStatisticsYear, IncidentStatisticsMonth, AppSettings
 from plugins.reports.to import MapItemDetailsTO, TextSectionTO, VoteSectionTO, \
     MapItemTO, GeoPointTO, MapIconTO, MapVoteOptionTO
+from plugins.reports.utils import get_app_id_from_user_id
+
 
 ICON_MAPPING = {
     IncidentStatus.NEW: ('new', '#f10812'),
@@ -122,3 +130,65 @@ def convert_to_item_details_to(incident, vote, user_vote, language):
     if vote:
         item.sections.append(VoteSectionTO(id=u'vote1', options=get_vote_options(vote, user_vote, language)))
     return item
+
+
+@ndb.transactional()
+def save_app_id(app_id):
+    app_settings_key = AppSettings.create_key(app_id)
+    if app_settings_key.get():
+        return
+    AppSettings(key=app_settings_key).put()
+
+
+def re_count_incidents():
+    run_job(_re_count_incidents_query, [], _re_count_incidents_worker, [])
+        
+        
+def _re_count_incidents_query():
+    return AppSettings.query()
+
+
+def _re_count_incidents_worker(key):
+    re_count_incidents_app(key.id().decode('utf8'))
+
+
+def re_count_incidents_app(app_id):
+    today = date.today()
+    yesterday = today - relativedelta(days=1)
+    
+    if today.year != yesterday.year:
+        re_count_incidents_month(app_id, yesterday.year, yesterday.month)
+        deferred.defer(re_count_incidents_year, app_id, yesterday.year,
+                       _countdown=5)
+
+    elif today.month != yesterday.month:
+        re_count_incidents_month(app_id, yesterday.year, yesterday.month)
+
+    re_count_incidents_month(app_id, today.year, today.month)
+    deferred.defer(re_count_incidents_year, app_id, today.year,
+                   _countdown=5)
+    
+    
+def re_count_incidents_month(app_id, year, month):
+    resolved_count = Incident.list_by_app_status_and_date(app_id,
+                                                          IncidentStatus.RESOLVED,
+                                                          datetime(year, month, 1),
+                                                          datetime(year, month + 1, 1)).count()
+
+    IncidentStatisticsMonth(key=IncidentStatisticsMonth.create_key(app_id, year, month),
+                            app_id=app_id,
+                            year=year,
+                            month=month,
+                            resolved_count=resolved_count).put()
+                            
+                            
+def re_count_incidents_year(app_id, year):
+    resolved_count = 0
+    for s in IncidentStatisticsMonth.list_by_app_and_year(app_id, year):
+        resolved_count += s.resolved_count
+
+    IncidentStatisticsYear(key=IncidentStatisticsYear.create_key(app_id, year),
+                           app_id=app_id,
+                           year=year,
+                           resolved_count=resolved_count).put()
+    

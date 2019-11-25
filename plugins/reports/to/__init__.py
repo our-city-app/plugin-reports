@@ -135,6 +135,29 @@ class MapSectionTO(object_factory):
 class MapIconTO(TO):
     id = unicode_property('1')
     color = unicode_property('2')
+    
+
+
+class MapAnnouncementType(object):
+    TEXT = 'text'
+
+
+class TextAnnouncementTO(TO):
+    type = unicode_property('type', default=MapAnnouncementType.TEXT)
+    title = unicode_property('title')
+    description = unicode_property('description')
+
+
+MAP_ANNOUNCEMENT_MAPPING = {
+    MapAnnouncementType.TEXT: TextAnnouncementTO,
+}
+
+
+class MapAnnouncementTO(object_factory):
+    type = unicode_property('type')
+
+    def __init__(self):
+        super(MapAnnouncementTO, self).__init__('type', MAP_ANNOUNCEMENT_MAPPING)
 
 
 class MapItemTO(TO):
@@ -155,6 +178,7 @@ class GetMapItemsResponseTO(TO):
     cursor = unicode_property('1', default=None)
     items = typed_property('2', MapItemTO, True, default=[])
     distance = long_property('3', default=0)
+    top_sections = typed_property('top_sections', MapSectionTO(), True, default=[])
 
 
 class GetMapItemDetailsResponseTO(TO):

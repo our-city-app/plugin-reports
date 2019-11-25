@@ -18,20 +18,21 @@
 from __future__ import unicode_literals
 
 import webapp2
-from mcfw.consts import NOT_AUTHENTICATED
-from mcfw.restapi import rest_functions
-from mcfw.rpc import parse_complex_value
 
 from framework.bizz.authentication import get_current_session
 from framework.handlers import render_logged_in_page
 from framework.plugin_loader import Plugin, get_plugin, get_auth_plugin
 from framework.utils.plugins import Handler, Module
+from mcfw.consts import NOT_AUTHENTICATED
+from mcfw.restapi import rest_functions
+from mcfw.rpc import parse_complex_value
 from plugins.basic_auth.basic_auth_plugin import get_basic_auth_plugin
 from plugins.basic_auth.permissions import APP_ADMIN_GROUP_ID, BARole
 from plugins.reports import rogerthat_callbacks
 from plugins.reports.api import map_api, reports
 from plugins.reports.bizz.rtemail import EmailHandler
-from plugins.reports.handlers.cron import ReportsCleanupTimedOutHandler
+from plugins.reports.handlers.cron import ReportsCleanupTimedOutHandler, \
+    ReportsCountIncidentsHandler
 from plugins.reports.integrations import integrations_api
 from plugins.reports.integrations.int_green_valley.notifications import NotificationsCronHandler, \
     NotificationAttachmentHandler
@@ -66,18 +67,18 @@ class ReportsPlugin(Plugin):
         if auth == Handler.AUTH_UNAUTHENTICATED:
             yield Handler(url='/', handler=IndexHandler)
             yield Handler(url='/plugins/reports/topdesk/callback_api', handler=TopdeskCallbackHandler)
-            for mod in [map_api, reports]:
+            for mod in [map_api, reports, integrations_api]:
                 for url, handler in rest_functions(mod, authentication=NOT_AUTHENTICATED):
                     yield Handler(url=url, handler=handler)
-            for url, handler in rest_functions(integrations_api, authentication=NOT_AUTHENTICATED):
-                yield Handler(url=url, handler=handler)
             yield Handler(
                 '/plugins/reports/green_valley/<integration_id:[^/]+>/notifications/<notification_id:[^/]+>/attachments/<attachment_id:[^/]+>',
                 NotificationAttachmentHandler)
         if auth == Handler.AUTH_ADMIN:
             yield Handler(url='/_ah/mail/<email:.*>', handler=EmailHandler)
-            yield Handler(url='/admin/cron/reports/cleanup/timed_out', handler=ReportsCleanupTimedOutHandler)
             yield Handler(url='/admin/cron/reports/green-valley-notifications', handler=NotificationsCronHandler)
+            yield Handler(url='/admin/cron/reports/cleanup/timed_out', handler=ReportsCleanupTimedOutHandler)
+            yield Handler(url='/admin/cron/reports/incidents/count', handler=ReportsCountIncidentsHandler)
+
 
     def get_modules(self):
         yield Module('integrations', [], 1)

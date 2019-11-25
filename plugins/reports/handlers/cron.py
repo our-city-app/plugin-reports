@@ -17,6 +17,7 @@
 
 import webapp2
 
+from plugins.reports.bizz import re_count_incidents
 from plugins.reports.bizz.incidents import cleanup_timed_out
 
 
@@ -24,3 +25,9 @@ class ReportsCleanupTimedOutHandler(webapp2.RequestHandler):
 
     def get(self):
         cleanup_timed_out()
+
+
+class ReportsCountIncidentsHandler(webapp2.RequestHandler):
+
+    def get(self):
+        re_count_incidents()
