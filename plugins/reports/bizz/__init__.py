@@ -132,7 +132,6 @@ def convert_to_item_details_to(incident, vote, user_vote, language):
     return item
 
 
-@ndb.transactional()
 def save_app_id(app_id):
     app_settings_key = AppSettings.create_key(app_id)
     if app_settings_key.get():
@@ -142,8 +141,8 @@ def save_app_id(app_id):
 
 def re_count_incidents():
     run_job(_re_count_incidents_query, [], _re_count_incidents_worker, [])
-        
-        
+
+
 def _re_count_incidents_query():
     return AppSettings.query()
 
@@ -155,7 +154,7 @@ def _re_count_incidents_worker(key):
 def re_count_incidents_app(app_id):
     today = date.today()
     yesterday = today - relativedelta(days=1)
-    
+
     if today.year != yesterday.year:
         re_count_incidents_month(app_id, yesterday.year, yesterday.month)
         deferred.defer(re_count_incidents_year, app_id, yesterday.year,
@@ -167,8 +166,8 @@ def re_count_incidents_app(app_id):
     re_count_incidents_month(app_id, today.year, today.month)
     deferred.defer(re_count_incidents_year, app_id, today.year,
                    _countdown=5)
-    
-    
+
+
 def re_count_incidents_month(app_id, year, month):
     resolved_count = Incident.list_by_app_status_and_date(app_id,
                                                           IncidentStatus.RESOLVED,
@@ -180,8 +179,8 @@ def re_count_incidents_month(app_id, year, month):
                             year=year,
                             month=month,
                             resolved_count=resolved_count).put()
-                            
-                            
+
+
 def re_count_incidents_year(app_id, year):
     resolved_count = 0
     for s in IncidentStatisticsMonth.list_by_app_and_year(app_id, year):
@@ -191,4 +190,3 @@ def re_count_incidents_year(app_id, year):
                            app_id=app_id,
                            year=year,
                            resolved_count=resolved_count).put()
-    

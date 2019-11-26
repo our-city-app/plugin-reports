@@ -15,8 +15,8 @@
 #
 # @@license_version:1.5@@
 
-from datetime import date
 import logging
+from datetime import date
 
 from google.appengine.ext import ndb
 from typing import List
@@ -46,9 +46,9 @@ def get_report_map_announcement(user_id):
     user_incident_announcement_key = UserIncidentAnnouncement.create_key(user_id, today.year, today.month)
     if user_incident_announcement_key.get():
         return None
-    
+
     UserIncidentAnnouncement(key=user_incident_announcement_key).put()
-    
+
     app_id = get_app_id_from_user_id(user_id)
     s = IncidentStatisticsYear.create_key(app_id, today.year).get()
     if not s:
@@ -58,7 +58,6 @@ def get_report_map_announcement(user_id):
     # todo translate
     return TextAnnouncementTO(title=u'Opgeloste meldingen',
                               description=u'Dit jaar zijn er al %s meldingen opgelost.' % s.resolved_count)
-    
 
 
 def get_report_map_items(user_id, lat, lon, distance, status, limit, cursor):
@@ -122,4 +121,3 @@ def get_top_sections_resolved(user_id):
     # todo translate
     return [TextSectionTO(title=u'Opgeloste meldingen',
                           description=u'Dit jaar zijn er al %s meldingen opgelost.' % s.resolved_count)]
-

@@ -130,7 +130,8 @@ def check_for_new_notifications(incident_key, integration_id):
     if isinstance(incident.integration_params, IntegrationParamsGreenValley):
         new_notifications = [n for n in notifications if n.id not in incident.integration_params.notification_ids]
         try_or_defer(_send_notification, new_notifications, incident_key, integration_id)
-    raise Exception('Invalid integration params for incident %s' % incident.id)
+    else:
+        raise Exception('Invalid integration params for incident %s' % incident.id)
 
 
 @ndb.transactional(xg=True)
