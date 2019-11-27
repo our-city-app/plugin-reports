@@ -167,7 +167,6 @@ def _send_notification(notifications, incident_key, integration_id):
                                             json_rpc_id=guid())
         if not incident.integration_params.parent_message_id:
             incident.integration_params.parent_message_id = message_id
-    logging.debug(incident)
     incident.put()
 
 

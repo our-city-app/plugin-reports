@@ -46,11 +46,6 @@ class TopdeskApiException(Exception):
         return self.message
 
 
-def get_topdesk_settings(sik):
-    # type: (str) -> TopdeskSettings
-    return get_integration_settings(sik).data
-
-
 def _get_person_info_from_rogerthat_user(settings, rogerthat_user):
     # type: (TopdeskSettings, RogerthatUser) -> dict
     split_name = rogerthat_user.name.split(' ')
@@ -196,7 +191,7 @@ def _maybe_resize_image(image):
     return result.getvalue()
 
 
-def upload_attachment(sik, topdesk_incident_id, url, file_name):
+def upload_attachment(integration_id, topdesk_incident_id, url, file_name):
     file_content = _download(url)
 
     content_type = 'image/jpg'
@@ -204,12 +199,11 @@ def upload_attachment(sik, topdesk_incident_id, url, file_name):
     payload, payload_content_type = encode_multipart_formdata([
         ('file', (file_name, file_content, content_type)),
     ])
-    settings = get_topdesk_settings(sik)
+    settings = get_integration_settings(integration_id).data
     headers = _get_headers(settings.username, settings.password)  # todo fix
     headers['Content-Type'] = payload_content_type
 
     response = urlfetch.fetch('%s/api/incidents/id/%s/attachments' % (settings.api_url, topdesk_incident_id),
-                              # todo fix
                               payload=payload,
                               method=urlfetch.POST,
                               headers=headers,
