@@ -132,7 +132,7 @@ class IncidentDescription(object):
 
     def add(self, component, value, field=None):
         # type: (FieldComponentTO, object, object) -> object
-        if not value or field in ('type_id', 'type'):
+        if not value or field in ('type_id', 'type', 'locatiebepaling_blocks'):
             return
         if field == 'subject':
             self.title = value
