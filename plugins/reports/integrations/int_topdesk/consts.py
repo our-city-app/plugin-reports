@@ -25,6 +25,7 @@ class TopdeskFieldMappingType(Enum):
     FIXED_VALUE = 4
     REVERSE_MAPPING = 5
     PUBLIC_CONSENT = 6  # consent that incident can be made public
+    GPS_DUAL_FIELD = 7  # lat, lon
 
 
 class TopdeskPropertyName(Enum):

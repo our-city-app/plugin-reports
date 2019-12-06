@@ -216,6 +216,10 @@ def get_field_mapping_values(settings, steps):
                 assert isinstance(result, LocationWidgetResultTO)
                 custom_values[mapping.property][mapping.value_properties[0]] = '%s,%s' % (result.latitude,
                                                                                           result.longitude)
+            elif mapping.type == TopdeskFieldMappingType.GPS_DUAL_FIELD:
+                assert isinstance(result, LocationWidgetResultTO)
+                custom_values[mapping.property][mapping.value_properties[0]] = result.latitude
+                custom_values[mapping.property][mapping.value_properties[1]] = result.longitude
                 included_step_ids.add(step.step_id)
             elif mapping.type == TopdeskFieldMappingType.GPS_URL:
                 assert isinstance(result, LocationWidgetResultTO)
