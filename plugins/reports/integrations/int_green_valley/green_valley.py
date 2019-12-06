@@ -224,6 +224,7 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
             elif isinstance(gv_comp, GvMappingLocation):
                 if isinstance(comp_val, LocationComponentValueTO):
                     details.geo_location = GeoPt(comp_val.latitude, comp_val.longitude)
+                    _add_flex(flexes, gv_comp.location_type, gv_comp.location_type_value)
                     _add_flex(flexes, gv_comp.address, ', '.join(comp_val.address.address_lines))
                     _add_flex(flexes, gv_comp.coordinates, '%s,%s' % (comp_val.latitude, comp_val.longitude))
             elif isinstance(gv_comp, GvMappingAttachment):

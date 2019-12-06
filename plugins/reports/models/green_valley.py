@@ -67,6 +67,8 @@ class GvMappingLocation(TO):
     id = unicode_property('id')
     coordinates = unicode_property('coordinates', default=None)
     address = unicode_property('address', default=None)
+    location_type = unicode_property('location_type', default='locatiebepaling_blocks')
+    location_type_value = unicode_property('location_type_value', default='kaart')
 
 
 class GvMappingAttachment(GvMappingFlex):
