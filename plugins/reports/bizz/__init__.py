@@ -172,7 +172,7 @@ def re_count_incidents_month(app_id, year, month):
     resolved_count = Incident.list_by_app_status_and_date(app_id,
                                                           IncidentStatus.RESOLVED,
                                                           datetime(year, month, 1),
-                                                          datetime(year, month + 1, 1)).count()
+                                                          datetime(year, month, 1) + relativedelta(months=1)).count()
 
     IncidentStatisticsMonth(key=IncidentStatisticsMonth.create_key(app_id, year, month),
                             app_id=app_id,
