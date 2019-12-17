@@ -61,7 +61,7 @@ class TopdeskfieldMapping(TO):
     # See TopdeskFieldMappingType
     type = long_property('type')
     # In case type == TopdeskFieldMappingType.FIXED_VALUE, 'step_id' is ignored and this is always used
-    default_value = unicode_property('default_value')
+    default_value = unicode_property('default_value', default=None)
 
 
 class TopdeskSettings(TO):
@@ -408,57 +408,57 @@ class UserIncidentVote(NdbModel):
 
 class UserIncidentAnnouncement(NdbModel):
     NAMESPACE = NAMESPACE
-    
+
     created = ndb.DateTimeProperty(auto_now_add=True)
-    
+
     @classmethod
     def create_parent_key(cls, user_id):
         return ndb.Key(cls, user_id, namespace=cls.NAMESPACE)
-    
+
     @classmethod
     def create_key(cls, user_id, year, month):
         return ndb.Key(cls, u'%s-%02d' % (year, month), parent=cls.create_parent_key(user_id))
-    
+
 
 class AppSettings(NdbModel):
     NAMESPACE = NAMESPACE
-    
+
     @property
     def app_id(self):
         return self.key.id().decode('utf8')
-    
+
     @classmethod
     def create_key(cls, app_id):
         return ndb.Key(cls, app_id, namespace=NAMESPACE)
 
-    
+
 class IncidentStatisticsYear(NdbModel):
     NAMESPACE = NAMESPACE
-    
+
     app_id = ndb.StringProperty(indexed=True)
     year = ndb.IntegerProperty(indexed=True)
     resolved_count = ndb.IntegerProperty(indexed=False)
-    
+
     @classmethod
     def create_key(cls, app_id, year):
         return ndb.Key(cls, u'%s-%s' % (app_id, year), namespace=NAMESPACE)
-    
-    
+
+
 class IncidentStatisticsMonth(NdbModel):
     NAMESPACE = NAMESPACE
-    
+
     app_id = ndb.StringProperty(indexed=True)
     year = ndb.IntegerProperty(indexed=True)
     month = ndb.IntegerProperty(indexed=True)
     resolved_count = ndb.IntegerProperty(indexed=False)
-    
+
     @classmethod
     def create_key(cls, app_id, year, month):
         return ndb.Key(cls, u'%s-%s-%02d' % (app_id, year, month), namespace=NAMESPACE)
-    
+
     @classmethod
     def list_by_app_and_year(cls, app_id, year):
         return cls.query() \
             .filter(cls.app_id == app_id) \
             .filter(cls.year == year)
-    
+

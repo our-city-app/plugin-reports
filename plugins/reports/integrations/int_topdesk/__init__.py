@@ -123,13 +123,16 @@ def create_incident(config, rt_user, incident, steps):
         if step.step_id not in request_step_ids:
             continue
         if isinstance(step, FormFlowStepTO):
-            step_value = step.display_value
             if step.answer_id == FormTO.POSITIVE:
                 val = step.get_value()
+                if not val:
+                    continue
                 if isinstance(val, LocationWidgetResultTO):
                     address = reverse_geocode_location(val)
                     if address:
                         step_value = '%s\n%s' % (step.display_value, address)
+                else:
+                    step_value = step.display_value
             else:
                 step_value = step.button
         elif isinstance(step, MessageFlowStepTO):
@@ -201,16 +204,16 @@ def get_field_mapping_values(settings, steps):
                 continue
             result = step.get_value()
             if mapping.type == TopdeskFieldMappingType.TEXT:
-                result = result and result.strip() or ''
+                result = result and result.strip() or mapping.default_value or ''
                 if mapping.property in (TopdeskPropertyName.OPTIONAL_FIELDS_1, TopdeskPropertyName.OPTIONAL_FIELDS_2):
-                    custom_values[mapping.property][mapping.value_properties[0]] = result or mapping.default_value
+                    custom_values[mapping.property][mapping.value_properties[0]] = result
                     included_step_ids.add(step.step_id)
                 else:
                     if mapping.property == TopdeskPropertyName.BRIEF_DESCRIPTION:
                         if result:
-                            custom_values[mapping.property] = result[:80] or mapping.default_value
+                            custom_values[mapping.property] = result[:80]
                     else:
-                        custom_values[mapping.property]['id'] = result or mapping.default_value
+                        custom_values[mapping.property]['id'] = result
                         included_step_ids.add(step.step_id)
             elif mapping.type == TopdeskFieldMappingType.GPS_SINGLE_FIELD:
                 assert isinstance(result, LocationWidgetResultTO)
