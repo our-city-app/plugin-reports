@@ -53,7 +53,7 @@ def get_report_map_announcement(user_id):
     s = IncidentStatisticsYear.create_key(app_id, today.year).get()
     if not s:
         return None
-    if s.resolved_count == 0:
+    if s.resolved_count < 2:
         return None
     # todo translate
     return TextAnnouncementTO(title=u'Opgeloste meldingen',
