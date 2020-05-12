@@ -29,13 +29,12 @@ from mcfw.rpc import parse_complex_value
 from plugins.basic_auth.basic_auth_plugin import get_basic_auth_plugin
 from plugins.basic_auth.permissions import APP_ADMIN_GROUP_ID, BARole
 from plugins.reports import rogerthat_callbacks
-from plugins.reports.api import map_api, reports
+from plugins.reports.api import map_api, reports, green_valley
 from plugins.reports.bizz.rtemail import EmailHandler
 from plugins.reports.handlers.cron import ReportsCleanupTimedOutHandler, \
     ReportsCountIncidentsHandler, BuildIncidentStatisticsHandler
 from plugins.reports.integrations import integrations_api
-from plugins.reports.integrations.int_green_valley.notifications import NotificationsCronHandler, \
-    NotificationAttachmentHandler
+from plugins.reports.integrations.int_green_valley.notifications import NotificationAttachmentHandler
 from plugins.reports.integrations.int_topdesk.handlers import TopdeskCallbackHandler
 from plugins.reports.permissions import ROLE_GROUPS, ReportsPermission
 from plugins.reports.to import ReportsPluginConfiguration
@@ -67,7 +66,7 @@ class ReportsPlugin(Plugin):
         if auth == Handler.AUTH_UNAUTHENTICATED:
             yield Handler(url='/', handler=IndexHandler)
             yield Handler(url='/plugins/reports/topdesk/callback_api', handler=TopdeskCallbackHandler)
-            for mod in [map_api, reports, integrations_api]:
+            for mod in [map_api, reports, integrations_api, green_valley]:
                 for url, handler in rest_functions(mod, authentication=NOT_AUTHENTICATED):
                     yield Handler(url=url, handler=handler)
             yield Handler(
@@ -75,11 +74,9 @@ class ReportsPlugin(Plugin):
                 NotificationAttachmentHandler)
         if auth == Handler.AUTH_ADMIN:
             yield Handler(url='/_ah/mail/<email:.*>', handler=EmailHandler)
-            yield Handler(url='/admin/cron/reports/green-valley-notifications', handler=NotificationsCronHandler)
             yield Handler(url='/admin/cron/reports/cleanup/timed_out', handler=ReportsCleanupTimedOutHandler)
             yield Handler(url='/admin/cron/reports/incidents/count', handler=ReportsCountIncidentsHandler)
             yield Handler(url='/admin/cron/reports/incidents-stats', handler=BuildIncidentStatisticsHandler)
-
 
     def get_modules(self):
         yield Module('integrations', [], 1)

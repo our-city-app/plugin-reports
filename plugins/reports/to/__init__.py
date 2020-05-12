@@ -23,6 +23,8 @@ from .forms import *
 class ReportsPluginConfiguration(TO):
     google_maps_key = unicode_property('google_maps_key')
     oca_server_secret = unicode_property('oca_server_secret')
+    gv_activemq_proxy_url = unicode_property('gv_activemq_proxy_url')
+    gv_activemq_proxy_secret = unicode_property('gv_activemq_proxy_secret')
 
 
 class GeoPointTO(TO):
@@ -135,7 +137,7 @@ class MapSectionTO(object_factory):
 class MapIconTO(TO):
     id = unicode_property('1')
     color = unicode_property('2')
-    
+
 
 
 class MapAnnouncementType(object):

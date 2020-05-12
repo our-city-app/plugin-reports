@@ -14,24 +14,36 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+import json
 import logging
 import re
 from base64 import b64encode
 from collections import OrderedDict
 from mimetypes import guess_extension
+from uuid import uuid4
+from xml.etree.ElementTree import Element
 
-from google.appengine.api import urlfetch
+from google.appengine.api import urlfetch, users
 from google.appengine.ext.ndb import GeoPt
+
+from dateutil.parser import parse as parse_date
+from framework.plugin_loader import get_config
+from framework.utils import azzert
 from lxml import etree
 from mcfw.consts import DEBUG
-
+from plugins.reports.consts import NAMESPACE
+from plugins.reports.dal import get_integration_settings, get_rogerthat_user
 from plugins.reports.integrations.int_green_valley.attachments import get_attachment_content
-from plugins.reports.models import GreenValleySettings, Incident, IncidentDetails, IntegrationParamsGreenValley
+from plugins.reports.integrations.int_green_valley.notifications import GVExternalNotification, send_notification
+from plugins.reports.models import GreenValleySettings, Incident, IncidentDetails, IntegrationParamsGreenValley, \
+    IncidentStatus, IntegrationSettings, RogerthatUser
 from plugins.reports.models.green_valley import GvMappingFlex, GreenValleyFormConfiguration, GvMappingAttachment, \
     GvMappingLocation, GvMappingPerson, GvMappingField, GvMappingConst, GvMappingConsent
 from plugins.reports.to import FormSubmissionTO, FieldComponentTO, DynamicFormTO, TextInputComponentValueTO, \
     MultiSelectComponentValueTO, SingleSelectComponentValueTO, LocationComponentValueTO, \
     FileComponentValueTO, MultiSelectComponentTO, ValueTO
+from plugins.rogerthat_api.plugin_consts import NAMESPACE as ROGERTHAT_NAMESPACE
+from typing import Optional
 
 ATTR_PREFIX = '__'
 
@@ -113,11 +125,14 @@ def _execute_gv_request(configuration, path, method=urlfetch.GET, body=None):
         'Authorization': _get_auth_header(configuration),
         'Content-Type': 'application/xml',
     }
-    result = urlfetch.fetch(url, body, method, headers=headers, deadline=30)  # type: urlfetch._URLFetchResult
+    if DEBUG:
+        logging.debug('Request to %s\n%s', url, body)
+    result = urlfetch.fetch(url, body, method, headers=headers, deadline=55)  # type: urlfetch._URLFetchResult
     if DEBUG:
         logging.debug(result.content)
     if result.status_code not in (200, 201):
-        logging.debug(result.content)
+        if not DEBUG:
+            logging.debug(result.content)
         additional = ''
         if result.status_code == 500:
             additional = 'Did you configure the correct type_id?'
@@ -318,3 +333,117 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
     incident.user_consent = user_consent
     incident.integration_params = IntegrationParamsGreenValley(notification_ids=[])
     return True
+
+
+def _request(integration_id, topic, command):
+    config = get_config(NAMESPACE)
+    url = '%s/topics' % config.gv_activemq_proxy_url
+    payload = {
+        'topic': topic,
+        'integration_id': integration_id,
+        'command': command
+    }
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': config.gv_activemq_proxy_secret
+    }
+    result = urlfetch.fetch(url, json.dumps(payload), method=urlfetch.POST,
+                            headers=headers)  # type: urlfetch._URLFetchResult
+    if result.status_code not in (200, 204):
+        logging.debug('Status: %s\nContent: %s', result.status_code, result.content)
+        raise Exception('Could not send command %s for topic %s' % (command, topic))
+
+
+def register_new_gv_integration(integration_id, topic):
+    _request(integration_id, topic, 'subscribe')
+
+
+def remove_gv_integration(integration_id, topic):
+    _request(integration_id, topic, 'unsubscribe')
+
+
+def handle_message_received(integration_id, notification):
+    # type: (int, GVExternalNotification) -> None
+    if not notification.caseReference:
+        logging.debug(notification)
+        raise Exception('No caseReference set for notification!')
+    incident = Incident.get_by_external_id(integration_id, notification.caseReference)  # type: Incident
+    integration_settings = get_integration_settings(integration_id)
+    if not incident:
+        # Incident was not created via this backend. Create it now!
+        incident = create_incident_from_gv_notification(integration_settings, notification)
+        logging.debug('Created incident: %s', incident)
+        incident.put()
+    if incident.user_id and notification.id not in incident.integration_params.notification_ids:
+        incident.integration_params.notification_ids.append(notification.id)
+        send_notification(notification, integration_settings, incident)
+        incident.put()
+
+
+def create_incident_from_gv_notification(integration_settings, notification):
+    # type: (IntegrationSettings, GVExternalNotification) -> Incident
+    user_id = None
+    if notification.ocaContext:
+        # Resolve user id from ocaContext
+        user_email = get_user_email_from_oca_context(notification.ocaContext)
+        if user_email:
+            user_id = create_app_user_by_email(user_email, integration_settings.app_id).email()
+            rt_user = get_rogerthat_user(user_id)
+            if not rt_user:
+                rt_user = RogerthatUser(key=RogerthatUser.create_key(user_id))
+                rt_user.email = user_id
+                rt_user.name = '%s %s' % (notification.firstName, notification.lastName)
+                rt_user.app_id = integration_settings.app_id
+                rt_user.put()
+
+    result_xml = _execute_gv_request(integration_settings.data, '/cases/' + notification.caseReference, urlfetch.GET)
+    elements = etree.XML(result_xml)  # type: Element
+    creation_date = parse_date(elements.findtext('date_created')).replace(tzinfo=None)
+    incident = Incident(key=Incident.create_key(str(uuid4())))
+    incident.set_status(IncidentStatus.NEW, creation_date)
+    incident.integration_id = integration_settings.id
+    incident.user_id = user_id
+    incident.cleanup_date = None
+    incident.source = 'web'
+    incident.visible = False
+    incident.user_consent = False
+    incident.external_id = notification.caseReference
+    incident.details = _get_incident_details_from_xml(elements)
+    integration_params = IntegrationParamsGreenValley()
+    integration_params.notification_ids = []
+    incident.integration_params = integration_params
+    sent_date = parse_date(notification.sentDate).replace(tzinfo=None)
+    incident.set_status(IncidentStatus.IN_PROGRESS, sent_date)
+    return incident
+
+
+def _get_incident_details_from_xml(elements):
+    # type: (Element) -> IncidentDetails
+    details = IncidentDetails()
+    # TODO: actually implement this method when needed & migrate existing incidents
+    return details
+
+
+def get_user_email_from_oca_context(context):
+    # type: (str) -> Optional[str]
+    base_url = get_config(ROGERTHAT_NAMESPACE).rogerthat_server_url
+    url = base_url + '/mobi/rest/user/context/' + context
+    result = urlfetch.fetch(url)  # type: urlfetch._URLFetchResult
+    if result.status_code == 200:
+        return json.loads(result)['id']
+    if result.status_code != 404:
+        logging.debug('%s: %s', result.status_code, result.content)
+        raise Exception('Unexpected status code %s for context request' % result.status_code)
+    return None
+
+
+def create_app_user_by_email(human_user_email, app_id=None):
+    azzert('/' not in human_user_email, 'human_user_email should not contain /')
+    azzert(':' not in human_user_email, 'human_user_email should not contain :')
+    if app_id is None:
+        app_id = 'rogerthat'
+    else:
+        azzert(app_id, 'app_id should not be empty')
+    if app_id != 'rogerthat':
+        return users.User('%s:%s' % (human_user_email, app_id))
+    return users.User(human_user_email)

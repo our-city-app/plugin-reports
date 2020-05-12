@@ -16,9 +16,12 @@
 # @@license_version:1.5@@
 from google.appengine.ext import ndb
 
+
+from framework.utils.cloud_tasks import schedule_tasks, create_task
 from mcfw.exceptions import HttpNotFoundException
 from plugins.reports.bizz.elasticsearch import re_index_incident
-from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident
+from plugins.reports.models import IntegrationSettingsData, IntegrationSettings, Consumer, RogerthatUser, Incident, \
+    GreenValleySettings
 from plugins.reports.to import IncidentTO
 from plugins.rogerthat_api.models.settings import RogerthatSettings
 from plugins.rogerthat_api.to import UserDetailsTO
@@ -49,8 +52,17 @@ def save_integration_settings(integration_id, rogerthat_api_key, name, consumer_
     consumer.ref = name
     consumer.integration_id = settings.id
 
+    tasks = []
+    if isinstance(data, GreenValleySettings):
+        from plugins.reports.integrations.int_green_valley.green_valley import register_new_gv_integration, \
+            remove_gv_integration
+        if data.topic and settings.data.topic != data.topic:
+            tasks.append(create_task(register_new_gv_integration, integration_id, data.topic))
+        if isinstance(settings.data, GreenValleySettings) and settings.data.topic and settings.data.topic != data.topic:
+            tasks.append(create_task(remove_gv_integration, integration_id, settings.data.topic))
     settings.data = data
     ndb.put_multi([settings, rogerthat_settings, consumer])
+    schedule_tasks(tasks)
     return settings, rogerthat_settings
 
 

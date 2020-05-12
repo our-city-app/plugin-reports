@@ -23,23 +23,20 @@ from base64 import b64encode, b64decode
 import webapp2
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
-from google.appengine.ext.deferred import PermanentTaskFailure
+
+from framework.to import TO
+from framework.utils import get_server_url
+from framework.utils import guid, convert_to_str
 from html2text import HTML2Text
 from mcfw.cache import cached
 from mcfw.properties import unicode_property, long_property, typed_property
 from mcfw.rpc import arguments, returns
-from typing import List
-
-from framework.bizz.job import run_job
-from framework.to import TO
-from framework.utils import get_server_url
-from framework.utils import try_or_defer, guid, convert_to_str
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.dal import get_rogerthat_user
-from plugins.reports.models import GreenValleySettings, Incident, IntegrationSettings, IntegrationProvider, \
-    IntegrationParamsGreenValley
+from plugins.reports.models import GreenValleySettings, Incident, IntegrationSettings, IntegrationParamsGreenValley
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging import AttachmentTO
+from typing import List
 
 
 class GVExternalNotificationAttachment(TO):
@@ -63,6 +60,7 @@ class GVExternalNotification(TO):
     message = unicode_property('message')
     sentDate = unicode_property('sentDate')
     source = unicode_property('source')  # one of WORKFLOW, CASE_MESSAGE, EXTERNAL_TASK
+    ocaContext = unicode_property('ocaContext')
 
 
 @cached(0, lifetime=14 * 60)
@@ -112,62 +110,33 @@ def get_notifications(settings, case_reference):
     return GVExternalNotification.from_list(result)
 
 
-def _get_all_incidents(integration_id):
-    return Incident.list_by_integration_id(integration_id)
-
-
-def check_for_new_notifications(incident_key, integration_id):
-    keys = incident_key, IntegrationSettings.create_key(integration_id)
-    incident, settings = ndb.get_multi(keys)  # type: Incident, IntegrationSettings
-    if not incident.external_id:
-        logging.info('Skipping incident %s, external id not set', incident.id)
-        return
-    try:
-        notifications = get_notifications(settings.data, incident.external_id)
-    except Exception as e:
-        logging.exception('Could not fetch notifications')
-        raise PermanentTaskFailure(e.message)
-    if isinstance(incident.integration_params, IntegrationParamsGreenValley):
-        new_notifications = [n for n in notifications if n.id not in incident.integration_params.notification_ids]
-        try_or_defer(_send_notification, new_notifications, incident_key, integration_id)
-    else:
-        raise Exception('Invalid integration params for incident %s' % incident.id)
-
-
-@ndb.transactional(xg=True)
-def _send_notification(notifications, incident_key, integration_id):
-    # type: (List[GVExternalNotification], ndb.Key, int) -> None
-    keys = incident_key, IntegrationSettings.create_key(integration_id)
-    incident, settings = ndb.get_multi(keys)  # type: Incident, IntegrationSettings
+def send_notification(notification, settings, incident):
+    # type: (GVExternalNotification, IntegrationSettings, Incident) -> None
     rt_user = get_rogerthat_user(incident.user_id)
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
     assert isinstance(incident.integration_params, IntegrationParamsGreenValley)
     server_url = get_server_url()
-    for notification in notifications:
-        incident.integration_params.notification_ids.append(notification.id)
-        unescaped = HTMLParser().unescape(notification.message)
-        message = html_to_markdown(unescaped)
-        if not message:
-            continue
-        attachments = []
-        if notification.attachments:
-            for attachment in notification.attachments:
-                if attachment.mimeType in AttachmentTO.CONTENT_TYPES:
-                    a = AttachmentTO()
-                    a.name = attachment.name
-                    a.size = attachment.fileSize
-                    a.content_type = attachment.mimeType
-                    a.download_url = NotificationAttachmentHandler.get_route(server_url, settings.id, notification.id,
-                                                                             attachment.id)
-                    attachments.append(a)
-        # TODO: maybe don't send initial confirmation message containing the entire form the user has sent
-        message_id = send_rogerthat_message(settings.sik, member, message,
-                                            attachments=attachments,
-                                            parent_message_key=incident.integration_params.parent_message_id,
-                                            json_rpc_id=guid())
-        if not incident.integration_params.parent_message_id:
-            incident.integration_params.parent_message_id = message_id
-    incident.put()
+    unescaped = HTMLParser().unescape(notification.message)
+    message = html_to_markdown(unescaped)
+    if not message:
+        return
+    attachments = []
+    if notification.attachments:
+        for attachment in notification.attachments:
+            if attachment.mimeType in AttachmentTO.CONTENT_TYPES:
+                a = AttachmentTO()
+                a.name = attachment.name
+                a.size = attachment.fileSize
+                a.content_type = attachment.mimeType
+                a.download_url = NotificationAttachmentHandler.get_route(server_url, settings.id, notification.id,
+                                                                         attachment.id)
+                attachments.append(a)
+    message_id = send_rogerthat_message(settings.sik, member, message,
+                                        attachments=attachments,
+                                        parent_message_key=incident.integration_params.parent_message_id,
+                                        json_rpc_id=guid())
+    if not incident.integration_params.parent_message_id:
+        incident.integration_params.parent_message_id = message_id
 
 
 def html_to_markdown(html_content):
@@ -176,15 +145,6 @@ def html_to_markdown(html_content):
     converter = HTML2Text(bodywidth=0)
     converter.ignore_images = True
     return converter.handle(html_content).strip()
-
-
-class NotificationsCronHandler(webapp2.RequestHandler):
-    def get(self):
-        qry = IntegrationSettings.list_by_integration(
-            IntegrationProvider.GREEN_VALLEY)  # type: List[IntegrationSettings]
-        for integration in qry:
-            if isinstance(integration.data, GreenValleySettings) and integration.data.gateway_client_secret:
-                run_job(_get_all_incidents, [integration.id], check_for_new_notifications, [integration.id])
 
 
 class NotificationAttachmentHandler(webapp2.RequestHandler):

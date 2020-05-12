@@ -1,7 +1,4 @@
 cron:
-  - description: Check Green Valley Notifications
-    url: /admin/cron/reports/green-valley-notifications
-    schedule: every 1 hours
   - description: Cleanup timed out reports
     url: /admin/cron/reports/cleanup/timed_out
     schedule: every day 00:00

@@ -106,6 +106,10 @@ class GreenValleySettings(TO):
     gateway_client_id = unicode_property('gateway_client_id')
     gateway_client_secret = unicode_property('gateway_client_secret')
 
+    @property
+    def topic(self):
+        return '/topic/%s.communication.release.notification.topic' % self.realm.replace('-', '_') if self.realm else None
+
 
 INTEGRATION_SETTINGS_MAPPING = {
     IntegrationProvider.TOPDESK: TopdeskSettings,
@@ -502,4 +506,3 @@ class IncidentStatisticsMonth(NdbModel):
         return cls.query() \
             .filter(cls.app_id == app_id) \
             .filter(cls.year == year)
-
