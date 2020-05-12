@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2019 Green Valley Belgium NV
+# Copyright 2020 Green Valley NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,3 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
-
-from __future__ import unicode_literals
-
-from plugins.rogerthat_api.plugin_utils import Enum
-
-NAMESPACE = 'reports'
-INCIDENTS_QUEUE = 'incidents-queue'
-
-
-class IncidentTagType(Enum):
-    CATEGORY = 'category'
-    SUB_CATEGORY = 'subcategory'

@@ -64,6 +64,7 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
       case IntegrationProvider.TOPDESK:
         this.settings = {
           name: 'TOPdesk',
+          app_id: '',
           sik: '',
           rogerthat_api_key: '',
           consumer_id: '',
@@ -88,6 +89,7 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
       case IntegrationProvider.THREE_P:
         this.settings = {
           name: '3P',
+          app_id: '',
           sik: '',
           rogerthat_api_key: '',
           consumer_id: '',
@@ -100,6 +102,7 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
       case IntegrationProvider.GREEN_VALLEY:
         this.settings = {
           name: 'Green Valley',
+          app_id: '',
           sik: '',
           rogerthat_api_key: '',
           consumer_id: '',

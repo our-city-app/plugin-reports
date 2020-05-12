@@ -111,6 +111,7 @@ export type IntegrationList = { id: number; name: string }[];
 export interface IntegrationSettings {
   id?: number;
   name: string;
+  app_id: string;
   sik: string;
   consumer_id: string;
   rogerthat_api_key: string;

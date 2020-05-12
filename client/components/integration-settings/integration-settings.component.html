@@ -8,6 +8,10 @@
   </mat-select>
   </mat-form-field>
   <mat-form-field>
+    <mat-label>App id</mat-label>
+    <input name="app_id" matInput [(ngModel)]="settings.app_id" required>
+  </mat-form-field>
+  <mat-form-field>
     <mat-label>{{ 'r.service_identity_key' | translate }}</mat-label>
     <input name="sik" matInput [(ngModel)]="settings.sik" required>
   </mat-form-field>

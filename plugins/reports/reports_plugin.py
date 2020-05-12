@@ -32,7 +32,7 @@ from plugins.reports import rogerthat_callbacks
 from plugins.reports.api import map_api, reports
 from plugins.reports.bizz.rtemail import EmailHandler
 from plugins.reports.handlers.cron import ReportsCleanupTimedOutHandler, \
-    ReportsCountIncidentsHandler
+    ReportsCountIncidentsHandler, BuildIncidentStatisticsHandler
 from plugins.reports.integrations import integrations_api
 from plugins.reports.integrations.int_green_valley.notifications import NotificationsCronHandler, \
     NotificationAttachmentHandler
@@ -78,6 +78,7 @@ class ReportsPlugin(Plugin):
             yield Handler(url='/admin/cron/reports/green-valley-notifications', handler=NotificationsCronHandler)
             yield Handler(url='/admin/cron/reports/cleanup/timed_out', handler=ReportsCleanupTimedOutHandler)
             yield Handler(url='/admin/cron/reports/incidents/count', handler=ReportsCountIncidentsHandler)
+            yield Handler(url='/admin/cron/reports/incidents-stats', handler=BuildIncidentStatisticsHandler)
 
 
     def get_modules(self):

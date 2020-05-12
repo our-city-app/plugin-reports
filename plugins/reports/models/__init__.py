@@ -19,17 +19,18 @@ from __future__ import unicode_literals
 
 from datetime import datetime
 
-from dateutil.relativedelta import relativedelta
 from google.appengine.ext import ndb
-from mcfw.properties import unicode_property, object_factory, unicode_list_property, long_property, bool_property, \
-    typed_property
 
+from dateutil.relativedelta import relativedelta
 from framework.models.common import NdbModel, TOProperty
 from framework.to import TO
+from mcfw.properties import unicode_property, object_factory, unicode_list_property, long_property, bool_property, \
+    typed_property
 from plugins.reports.consts import NAMESPACE
 from plugins.reports.models.green_valley import GreenValleyFormConfiguration
 from plugins.rogerthat_api.plugin_utils import Enum
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
+from typing import List
 
 
 class ElasticsearchSettings(NdbModel):
@@ -64,6 +65,15 @@ class TopdeskfieldMapping(TO):
     default_value = unicode_property('default_value', default=None)
 
 
+class TypeMapping(TO):
+    # One of IncidentTagType
+    property = unicode_property('topdesk_property', default=None)
+
+
+class TopdeskReportSettings(TO):
+    type_fields = typed_property('type_field', TypeMapping, True)  # type: List[TypeMapping]
+
+
 class TopdeskSettings(TO):
     provider = unicode_property('provider', default=IntegrationProvider.THREE_P)
     api_url = unicode_property('api_url')
@@ -78,7 +88,8 @@ class TopdeskSettings(TO):
     caller_branch_id = unicode_property('caller_branch_id')
     branch_id = unicode_property('branch_id')
     unregistered_users = bool_property('unregistered_users')
-    field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)
+    field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)  # type: List[TopdeskfieldMapping]
+    report_settings = typed_property('report_settings', TopdeskReportSettings)  # type: TopdeskReportSettings
 
 
 class ThreePSettings(TO):
@@ -190,6 +201,7 @@ class IntegrationSettings(NdbModel):
     NAMESPACE = NAMESPACE
 
     integration = ndb.StringProperty(choices=IntegrationProvider.all())
+    app_id = ndb.StringProperty(required=True)
     name = ndb.StringProperty()
     consumer_id = ndb.StringProperty()
     sik = ndb.StringProperty()
@@ -264,24 +276,34 @@ class ReportsFilter(Enum):
 
 
 class IncidentDetails(NdbModel):
-    title = ndb.StringProperty(indexed=False)
-    description = ndb.TextProperty(indexed=False)
+    title = ndb.TextProperty()
+    description = ndb.TextProperty()
     geo_location = ndb.GeoPtProperty(indexed=False)
 
 
 class IncidentStatusDate(NdbModel):
-    date = ndb.DateTimeProperty()
+    date = ndb.DateTimeProperty()  # type: datetime
     status = ndb.StringProperty(choices=IncidentStatus.all())
+
+
+class IncidentTag(NdbModel):
+    type = ndb.StringProperty()
+    id = ndb.StringProperty()
+
+    def to_string(self):
+        if self.id:
+            return '%s#%s' % (self.type, self.id)
+        return self.type
 
 
 class Incident(NdbModel):
     NAMESPACE = NAMESPACE
 
-    app_id = ndb.StringProperty()
     user_id = ndb.StringProperty()
     report_date = ndb.DateTimeProperty()
+    resolve_date = ndb.DateTimeProperty()
     status_date = ndb.DateTimeProperty()
-    status_dates = ndb.StructuredProperty(IncidentStatusDate, repeated=True)
+    status_dates = ndb.StructuredProperty(IncidentStatusDate, repeated=True)  # type: List[IncidentStatusDate]
 
     # If user has given consent for this incident to be public
     user_consent = ndb.BooleanProperty(indexed=False, default=False)
@@ -289,12 +311,13 @@ class Incident(NdbModel):
     cleanup_date = ndb.DateTimeProperty()
 
     integration_id = ndb.IntegerProperty()
-    source = ndb.StringProperty(choices=['app'])
+    source = ndb.StringProperty(choices=['app', 'web'])
     params = TOProperty(IncidentParams())  # type: IncidentParams
     integration_params = TOProperty(IntegrationParams())  # type: IntegrationParams
     external_id = ndb.StringProperty()
     status = ndb.StringProperty(choices=IncidentStatus.all())
     details = ndb.LocalStructuredProperty(IncidentDetails)  # type: IncidentDetails
+    tags = ndb.StructuredProperty(IncidentTag, repeated=True)  # type: List[IncidentTag]
 
     @property
     def id(self):
@@ -334,28 +357,58 @@ class Incident(NdbModel):
             .order(-cls.report_date)
 
     @classmethod
-    def list_by_app_status_and_date(cls, app_id, status, from_date, to_date):
+    def list_by_integration_and_report_date(cls, integration_id, min_date, max_date):
         return cls.query() \
-            .filter(cls.app_id == app_id) \
+            .filter(cls.integration_id == integration_id) \
+            .filter(cls.report_date > min_date) \
+            .filter(cls.report_date < max_date) \
+            .order(-cls.report_date)
+
+    @classmethod
+    def list_by_integration_status_and_date(cls, integration_id, status, from_date, to_date):
+        return cls.query() \
+            .filter(cls.integration_id == integration_id) \
             .filter(cls.status == status) \
             .filter(cls.status_date > from_date) \
-            .filter(cls.status_date < to_date) \
+            .filter(cls.status_date < to_date)
 
-    def set_status(self, status):
+    def set_status(self, status, date=None):
         if self.status == status:
             return
-        now_ = datetime.now()
+        if not date:
+            date = datetime.now()
         self.status = status
-        self.status_date = now_
-        self.status_dates.append(IncidentStatusDate(date=now_, status=status))
+        self.status_date = date
+        self.status_dates.append(IncidentStatusDate(date=date, status=status))
+        if self.status == IncidentStatus.NEW:
+            self.report_date = date
         if self.status == IncidentStatus.RESOLVED:
-            self.cleanup_date = now_ + relativedelta(months=1)
+            self.resolve_date = date
+            self.cleanup_date = date + relativedelta(months=1)
         else:
+            self.resolve_date = None
             self.cleanup_date = None
 
     @classmethod
     def list_by_integration_id(cls, integration_id):
         return cls.query().filter(cls.integration_id == integration_id)
+
+    @classmethod
+    def get_oldest(cls):
+        return cls.query().order(cls.report_date).get()
+
+    @classmethod
+    def list_between_resolve_date(cls, integration_id, min_date, max_date):
+        return cls.query()\
+            .filter(cls.integration_id == integration_id)\
+            .filter(cls.resolve_date >= min_date)\
+            .filter(cls.resolve_date < max_date)
+
+    @classmethod
+    def list_without_resolve_date(cls, integration_id):
+        return cls.query()\
+            .filter(cls.integration_id == integration_id)\
+            .filter(cls.resolve_date == None)
 
 
 class FormIntegration(NdbModel):
@@ -420,18 +473,6 @@ class UserIncidentAnnouncement(NdbModel):
         return ndb.Key(cls, u'%s-%02d' % (year, month), parent=cls.create_parent_key(user_id))
 
 
-class AppSettings(NdbModel):
-    NAMESPACE = NAMESPACE
-
-    @property
-    def app_id(self):
-        return self.key.id().decode('utf8')
-
-    @classmethod
-    def create_key(cls, app_id):
-        return ndb.Key(cls, app_id, namespace=NAMESPACE)
-
-
 class IncidentStatisticsYear(NdbModel):
     NAMESPACE = NAMESPACE
 
@@ -447,9 +488,9 @@ class IncidentStatisticsYear(NdbModel):
 class IncidentStatisticsMonth(NdbModel):
     NAMESPACE = NAMESPACE
 
-    app_id = ndb.StringProperty(indexed=True)
-    year = ndb.IntegerProperty(indexed=True)
-    month = ndb.IntegerProperty(indexed=True)
+    app_id = ndb.StringProperty()
+    year = ndb.IntegerProperty()
+    month = ndb.IntegerProperty()
     resolved_count = ndb.IntegerProperty(indexed=False)
 
     @classmethod

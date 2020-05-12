@@ -14,21 +14,18 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
-
+import logging
 from datetime import datetime, date
 
-from dateutil.relativedelta import relativedelta
 from google.appengine.ext import ndb, deferred
 
+from dateutil.relativedelta import relativedelta
 from framework.bizz.job import run_job
 from framework.i18n_utils import translate
-from mcfw.rpc import returns, arguments
 from plugins.reports.models import IncidentVote, UserIncidentVote, Incident, IncidentStatus, \
-    IncidentStatisticsYear, IncidentStatisticsMonth, AppSettings
+    IncidentStatisticsYear, IncidentStatisticsMonth, IntegrationSettings
 from plugins.reports.to import MapItemDetailsTO, TextSectionTO, VoteSectionTO, \
     MapItemTO, GeoPointTO, MapIconTO, MapVoteOptionTO
-from plugins.reports.utils import get_app_id_from_user_id
-
 
 ICON_MAPPING = {
     IncidentStatus.NEW: ('new', '#f10812'),
@@ -132,47 +129,47 @@ def convert_to_item_details_to(incident, vote, user_vote, language):
     return item
 
 
-def save_app_id(app_id):
-    app_settings_key = AppSettings.create_key(app_id)
-    if app_settings_key.get():
-        return
-    AppSettings(key=app_settings_key).put()
-
-
 def re_count_incidents():
     run_job(_re_count_incidents_query, [], _re_count_incidents_worker, [])
 
 
 def _re_count_incidents_query():
-    return AppSettings.query()
+    return IntegrationSettings.query()
 
 
 def _re_count_incidents_worker(key):
-    re_count_incidents_app(key.id().decode('utf8'))
+    settings = key.get()  # type: IntegrationSettings
+    if not settings.app_id:
+        logging.error('Cannot build statistics, app id not set on integration settings "%s"(%s)', settings.name,
+                      settings.id)
+    else:
+        re_count_incidents_app(settings)
 
 
-def re_count_incidents_app(app_id):
+def re_count_incidents_app(integration_settings):
+    # type: (IntegrationSettings) -> None
     today = date.today()
     yesterday = today - relativedelta(days=1)
 
     if today.year != yesterday.year:
-        re_count_incidents_month(app_id, yesterday.year, yesterday.month)
-        deferred.defer(re_count_incidents_year, app_id, yesterday.year,
+        re_count_incidents_month(integration_settings.id, integration_settings.app_id, yesterday.year, yesterday.month)
+        deferred.defer(re_count_incidents_year, integration_settings.app_id, yesterday.year,
                        _countdown=5)
-
     elif today.month != yesterday.month:
-        re_count_incidents_month(app_id, yesterday.year, yesterday.month)
+        re_count_incidents_month(integration_settings.id, integration_settings.app_id, yesterday.year, yesterday.month)
 
-    re_count_incidents_month(app_id, today.year, today.month)
-    deferred.defer(re_count_incidents_year, app_id, today.year,
+    re_count_incidents_month(integration_settings.id, integration_settings.app_id, today.year, today.month)
+    deferred.defer(re_count_incidents_year, integration_settings.app_id, today.year,
                    _countdown=5)
 
 
-def re_count_incidents_month(app_id, year, month):
-    resolved_count = Incident.list_by_app_status_and_date(app_id,
-                                                          IncidentStatus.RESOLVED,
-                                                          datetime(year, month, 1),
-                                                          datetime(year, month, 1) + relativedelta(months=1)).count()
+def re_count_incidents_month(integration_id, app_id, year, month):
+    first_day_of_month = datetime(year, month, 1)
+    next_month = datetime(year, month, 1) + relativedelta(months=1)
+    resolved_count = Incident.list_by_integration_status_and_date(integration_id,
+                                                                  IncidentStatus.RESOLVED,
+                                                                  first_day_of_month,
+                                                                  next_month).count()
 
     IncidentStatisticsMonth(key=IncidentStatisticsMonth.create_key(app_id, year, month),
                             app_id=app_id,

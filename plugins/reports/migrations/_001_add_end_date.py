@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2019 Green Valley Belgium NV
+# Copyright 2020 Green Valley NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,20 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from google.appengine.ext import ndb
 
-from __future__ import unicode_literals
-
-from plugins.rogerthat_api.plugin_utils import Enum
-
-NAMESPACE = 'reports'
-INCIDENTS_QUEUE = 'incidents-queue'
+from plugins.reports.models import Incident, IncidentStatus
 
 
-class IncidentTagType(Enum):
-    CATEGORY = 'category'
-    SUB_CATEGORY = 'subcategory'
+def migrate(dry_run=True):
+    to_put = []
+    for incident in Incident.query():  # type: Incident
+        incident.resolve_date = None
+        if incident.status_dates:
+            last = incident.status_dates[-1]
+            if last.status == IncidentStatus.RESOLVED:
+                incident.resolve_date = last.date
+        to_put.append(incident)
+    if not dry_run:
+        ndb.put_multi(to_put)
+    return to_put

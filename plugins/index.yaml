@@ -11,7 +11,16 @@ indexes:
         direction: desc
   - kind: Incident
     properties:
-      - name: app_id
+      - name: integration_id
       - name: status
       - name: status_date
         direction: desc
+  - kind: Incident
+    properties:
+      - name: integration_id
+      - name: report_date
+        direction: desc
+  - kind: Incident
+    properties:
+      - name: integration_id
+      - name: resolve_date

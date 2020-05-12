@@ -8,3 +8,6 @@ cron:
   - description: Count incidents
     url: /admin/cron/reports/incidents/count
     schedule: every day 00:01
+  - description: Incident stats
+    url: /admin/cron/reports/incidents-stats
+    schedule: every day 00:02

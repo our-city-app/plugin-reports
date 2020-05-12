@@ -14,10 +14,12 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from datetime import datetime
 
 import webapp2
 
 from plugins.reports.bizz import re_count_incidents
+from plugins.reports.bizz.incident_statistics import build_monthly_incident_statistics, refresh_all_tags
 from plugins.reports.bizz.incidents import cleanup_timed_out
 
 
@@ -31,3 +33,9 @@ class ReportsCountIncidentsHandler(webapp2.RequestHandler):
 
     def get(self):
         re_count_incidents()
+
+
+class BuildIncidentStatisticsHandler(webapp2.RequestHandler):
+    def get(self):
+        build_monthly_incident_statistics(datetime.now())
+        refresh_all_tags()

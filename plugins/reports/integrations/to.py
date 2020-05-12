@@ -27,6 +27,7 @@ class IntegrationTO(TO):
     sik = unicode_property('sik')
     consumer_id = unicode_property('consumer_id')
     rogerthat_api_key = unicode_property('rogerthat_api_key')
+    app_id = unicode_property('app_id')
     data = typed_property('data', INTEGRATION_SETTINGS_DATA)
 
     @classmethod
@@ -38,5 +39,6 @@ class IntegrationTO(TO):
             sik=model.sik,
             rogerthat_api_key=rogerthat_settings and rogerthat_settings.api_key,
             consumer_id=model.consumer_id,
+            app_id=model.app_id,
             data=model.data,
         )

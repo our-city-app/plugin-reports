@@ -14,11 +14,13 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+import logging
 
+from dateutil import parser
 from mcfw.exceptions import HttpForbiddenException, HttpNotFoundException, HttpBadRequestException
 from mcfw.restapi import rest, GenericRESTRequestHandler
 from mcfw.rpc import returns, arguments
-
+from plugins.reports.bizz.incident_statistics import get_all_incident_statistics, get_incident_statistics
 from plugins.reports.bizz.incidents import list_incidents, create_incident_from_form
 from plugins.reports.dal import get_consumer, get_incident, update_incident
 from plugins.reports.models import FormIntegration, SaveFormIntegrationTO, IncidentStatus
@@ -69,13 +71,37 @@ def api_get_incidents(status=None, cursor=None):
     return IncidentListTO(cursor and cursor.to_websafe_string(), more, [IncidentTO.from_model(i) for i in results])
 
 
+@rest('/incident-statistics/details', 'get', silent_result=True)
+@returns([dict])
+@arguments(date=[unicode])
+def api_get_incident_statistics(date=None):
+    if date is None:
+        date = []
+    consumer = _get_consumer()
+    dates = []
+    for d in date:
+        try:
+            dates.append(parser.parse(d))
+        except (ValueError, OverflowError):
+            logging.debug('Ignoring invalid date: %s', d)
+    return get_incident_statistics(consumer.integration_id, dates)
+
+
+@rest('/incident-statistics', 'get', silent_result=True)
+@returns(dict)
+@arguments()
+def api_list_incident_statistics():
+    consumer = _get_consumer()
+    return get_all_incident_statistics(consumer.integration_id)
+
+
 @rest('/incidents/<incident_id:[^/]+>', 'get', silent_result=True)
 @returns(IncidentTO)
 @arguments(incident_id=unicode)
 def api_get_incident(incident_id):
     incident = get_incident(incident_id)
     if not incident:
-        raise HttpNotFoundException()
+        raise HttpNotFoundException('incident_not_found')
     consumer = _get_consumer()
     if incident.integration_id != consumer.integration_id:
         raise HttpForbiddenException()

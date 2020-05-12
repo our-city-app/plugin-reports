@@ -20,27 +20,32 @@ import json
 import logging
 import urllib
 from collections import defaultdict
+from urlparse import urlparse, parse_qs
+from uuid import uuid4
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import deferred, ndb
-from markdown import markdown
-from typing import List, Dict, Tuple
 
+import dateutil
 from framework.plugin_loader import get_config
 from framework.utils import try_or_defer, guid
+from markdown import markdown
 from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
-from plugins.reports.consts import NAMESPACE
+from plugins.reports.consts import NAMESPACE, IncidentTagType
 from plugins.reports.dal import get_integration_settings, get_rogerthat_user, get_incident_by_external_id
+from plugins.reports.integrations.int_green_valley.notifications import html_to_markdown
 from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName, TopdeskFieldMappingType
 from plugins.reports.integrations.int_topdesk.topdesk import upload_attachment, topdesk_api_call, \
     create_topdesk_person, update_topdesk_person
 from plugins.reports.models import IncidentDetails, Incident, RogerthatUser, TopdeskSettings, IntegrationSettings, \
-    IncidentStatus, IncidentParamsFlow, IntegrationParamsTopdesk, IdName
+    IncidentStatus, IncidentParamsFlow, IntegrationParamsTopdesk, IdName, IncidentTag
+from plugins.reports.models.incident_statistics import IncidentTagMapping, NameValue
 from plugins.reports.utils import get_step
 from plugins.rogerthat_api.to import MemberTO
 from plugins.rogerthat_api.to.messaging.flow import FormFlowStepTO, MessageFlowStepTO, BaseFlowStepTO, FlowStepTO
 from plugins.rogerthat_api.to.messaging.forms import Widget, FormTO, OpenIdWidgetResultTO, LocationWidgetResultTO
+from typing import List, Dict, Tuple, Optional
 
 SINGLE_LINE_FORM_TYPES = (Widget.TYPE_SINGLE_SELECT, Widget.TYPE_MULTI_SELECT, Widget.TYPE_DATE_SELECT,
                           Widget.TYPE_RANGE_SLIDER)
@@ -163,7 +168,6 @@ def create_incident(config, rt_user, incident, steps):
             if 'id' in value and not value['id']:
                 del data[key]
 
-    # TODO: add one or more of category/subcategory/calltype to title or description
     incident_details.title = data['briefDescription']
     incident_details.description = result_text
 
@@ -289,46 +293,141 @@ def get_reverse_value(settings, property_name, value, custom_values):
 
 def incident_feedback(integration_id, incident_id, message):
     # type: (int, str, str) -> None
-    incident = get_incident_by_external_id(integration_id, incident_id)
-    if not incident:
-        logging.debug('Received incident update for incident that is not in our database: %s\nIntegration id: %s',
-                      incident_id, integration_id)
-        return
+    logging.debug('Received incident feedback: %s', incident_id)
     settings = get_integration_settings(integration_id)
     if not settings:
         logging.error('Could not find topdesk settings for %s', integration_id)
         return
-    logging.debug('Received incident feedback: %s', incident_id)
-    response = topdesk_api_call(settings.data, '/api/incidents/id/%s' % incident.integration_params.id)
+
+    topdesk_settings = settings.data  # type: TopdeskSettings
+    response = topdesk_api_call(topdesk_settings, '/api/incidents/number/%s' % incident_id)
     logging.debug("Incident result from server: %s", response)
-    status = response['processingStatus']
-    params = incident.integration_params  # type: IntegrationParamsTopdesk
-    updated = True
-    if response['closed']:
-        incident.set_status(IncidentStatus.RESOLVED)
-    elif incident.status == IncidentStatus.NEW:
-        incident.set_status(IncidentStatus.IN_PROGRESS)
-    else:
-        updated = False
+
+    incident = create_or_update_incident_from_topdesk(integration_id, topdesk_settings, response)
+
     message_lines = ['Uw melding is geüpdatet.']
-    if params.status.id != status['id']:
-        params.status = IdName.from_dict(status)
-        message_lines.append('De huidige status van uw melding is nu "%s"' % params.status.name)
-    if message and params.last_message != message:
-        params.last_message = message
-        message_lines.append(message)
-        updated = True
-    if updated:
-        incident.put()
-        try_or_defer(re_index_incident, incident)
-    if len(message_lines) == 1:
-        logging.info('Not sending update message to user since nothing has been updated')
-    else:
-        rt_user = get_rogerthat_user(incident.user_id)
-        member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
-        complete_message = '\n'.join(message_lines)
-        if isinstance(incident.params, IncidentParamsFlow):
-            try_or_defer(send_rogerthat_message, settings.sik, member, complete_message,
-                         parent_message_key=incident.params.parent_message_key, json_rpc_id=guid())
+    if incident.source == 'app':
+        params = incident.integration_params  # type: IntegrationParamsTopdesk
+        status = response['processingStatus']
+        if params.status.id != status['id']:
+            params.status = IdName.from_dict(status)
+            message_lines.append('De huidige status van uw melding is nu "%s"' % params.status.name)
+        if message and params.last_message != message:
+            params.last_message = message
+            message_lines.append(message)
+    incident.put()
+    try_or_defer(re_index_incident, incident)
+
+    if incident.source == 'app':
+        if len(message_lines) == 1:
+            logging.info('Not sending update message to user since nothing has been updated')
         else:
-            raise Exception('Can\'t process incident feedback with invalid params: %s', incident.params)
+            rt_user = get_rogerthat_user(incident.user_id)
+            member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
+            complete_message = '\n'.join(message_lines)
+            if isinstance(incident.params, IncidentParamsFlow):
+                try_or_defer(send_rogerthat_message, settings.sik, member, complete_message,
+                             parent_message_key=incident.params.parent_message_key, json_rpc_id=guid())
+            else:
+                raise Exception('Can\'t process incident feedback with invalid params: %s', incident.params)
+
+
+def _get_geo_location_from_topdesk_incident(topdesk_settings, topdesk_incident):
+    # type: (TopdeskSettings, dict) -> Optional[ndb.GeoPt]
+    for mapping in topdesk_settings.field_mapping:
+        try:
+            if mapping.type == TopdeskFieldMappingType.GPS_DUAL_FIELD:
+                lat_prop, lon_prop = mapping.value_properties[0], mapping.value_properties[1]
+                lat = topdesk_incident[mapping.property][lat_prop].strip()
+                lon = topdesk_incident[mapping.property][lon_prop].strip()
+                if lat and lon:
+                    return ndb.GeoPt(lat, lon)
+            elif mapping.type == TopdeskFieldMappingType.GPS_SINGLE_FIELD:
+                value = topdesk_incident[mapping.property][mapping.value_properties[0]].strip()
+                if value:
+                    return ndb.GeoPt(value)
+            elif mapping.type == TopdeskFieldMappingType.GPS_URL:
+                value = topdesk_incident[mapping.property][mapping.value_properties[0]]
+                parsed_url = urlparse(value)
+                query_params = parse_qs(parsed_url)
+                query = query_params.get('query').strip()
+                if query:
+                    return ndb.GeoPt(query)
+        except Exception as e:
+            logging.info('Could not convert value of field %s.%s to gps location: %s', mapping.property,
+                         mapping.value_properties[0], e.message)
+            raise e
+    return None
+
+
+def create_or_update_incident_from_topdesk(integration_id, topdesk_settings, topdesk_incident):
+    # type: (int, TopdeskSettings, dict) -> Incident
+    external_id = topdesk_incident['number']
+    incident = get_incident_by_external_id(integration_id, external_id)
+
+    if not incident:
+        logging.debug('Creating new incident %s', external_id)
+        incident = create_incident_from_topdesk(integration_id, topdesk_incident)
+    set_incident_info(topdesk_incident, incident, topdesk_settings)
+    return incident
+
+
+def create_incident_from_topdesk(integration_id, topdesk_incident):
+    # type: (int, str) -> Incident
+    details = IncidentDetails()
+    details.title = topdesk_incident['briefDescription']
+    # Remove date and name from request
+    request = topdesk_incident['request']
+    if request:
+        request = request.split(': \n', 1)[1]
+        details.description = html_to_markdown(request)
+    incident = Incident(key=Incident.create_key(str(uuid4())))
+    incident.details = details
+    incident.integration_id = integration_id
+    incident.source = 'web'
+    incident.user_consent = False
+    incident.external_id = topdesk_incident['number']
+    incident.integration_params = IntegrationParamsTopdesk()
+    incident.integration_params.id = topdesk_incident['id']
+    incident.integration_params.status = IdName.from_dict(topdesk_incident['processingStatus'])
+    incident.visible = incident.can_show_on_map  # always false since no consent could be given
+    report_date = _parse_date(topdesk_incident['creationDate'])
+    incident.set_status(IncidentStatus.NEW, report_date)
+    return incident
+
+
+def set_incident_info(topdesk_incident, incident, topdesk_settings):
+    # type: (dict, Incident, TopdeskSettings) -> Incident
+    statuses = {s.status for s in incident.status_dates}
+    if IncidentStatus.IN_PROGRESS not in statuses:
+        incident.set_status(IncidentStatus.IN_PROGRESS, incident.report_date)
+    closed_date = _parse_date(topdesk_incident['closedDate'])
+    if topdesk_incident['closed']:
+        incident.set_status(IncidentStatus.RESOLVED, closed_date)
+    tags = []
+    for field in topdesk_settings.report_settings.type_fields:
+        value = topdesk_incident[field.property]
+        if value:
+            tags.append(IncidentTag(type=field.property, id=value['id']))
+    if not tags:
+        incident.tags.append(IncidentTag(type=IncidentTagType.CATEGORY))
+    incident.tags = tags
+    location_from_topdesk = _get_geo_location_from_topdesk_incident(topdesk_settings, topdesk_incident)
+    if location_from_topdesk:
+        incident.details.geo_location = location_from_topdesk
+    return incident
+
+
+def _parse_date(date):
+    return dateutil.parser.parse(date).replace(tzinfo=None) if date else None
+
+
+def refresh_topdesk_tags(integration_key):
+    integration = integration_key.get()  # type: IntegrationSettings
+    settings = integration.data
+    categories = _get_topdesk_values(settings, TopdeskPropertyName.CATEGORY, {})
+    subcategories = _get_topdesk_values(settings, TopdeskPropertyName.SUB_CATEGORY, {})
+    mapping = IncidentTagMapping(key=IncidentTagMapping.create_key(integration.id))
+    mapping.categories = [NameValue(id=c['id'], name=c['name']) for c in categories]
+    mapping.subcategories = [NameValue(id=c['id'], name=c['name']) for c in subcategories]
+    mapping.put()

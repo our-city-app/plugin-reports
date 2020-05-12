@@ -20,15 +20,15 @@ import json
 import logging
 from cStringIO import StringIO
 
-from PIL import Image
 from google.appengine.api import urlfetch
-from mcfw.exceptions import HttpBadRequestException
-from urllib3 import encode_multipart_formdata
 
+from PIL import Image
+from mcfw.exceptions import HttpBadRequestException
 from plugins.reports.dal import get_integration_settings
 from plugins.reports.integrations.int_topdesk.consts import ENDPOINTS, TopdeskPropertyName
 from plugins.reports.models import TopdeskSettings, RogerthatUser
 from plugins.rogerthat_api.to.messaging.forms import OpenIdWidgetResultTO
+from urllib3 import encode_multipart_formdata
 
 
 class TopdeskApiException(Exception):

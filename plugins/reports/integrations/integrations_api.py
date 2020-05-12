@@ -44,7 +44,7 @@ def api_get_settings(integration_id):
 def api_create_settings(data):
     # type: (IntegrationTO) -> IntegrationTO
     return IntegrationTO.from_model(*save_integration_settings(None, data.rogerthat_api_key, data.name,
-                                                               data.consumer_id, data.sik, data.data))
+                                                               data.consumer_id, data.sik, data.app_id, data.data))
 
 
 @rest('/integrations/<integration_id:[^/]+>', 'put', silent_result=True, scopes=ReportsPermission.UPDATE_INTEGRATIONS)
@@ -53,7 +53,7 @@ def api_create_settings(data):
 def api_save_settings(integration_id, data):
     # type: (str, IntegrationTO) -> IntegrationTO
     return IntegrationTO.from_model(*save_integration_settings(integration_id, data.rogerthat_api_key, data.name,
-                                                               data.consumer_id, data.sik, data.data))
+                                                               data.consumer_id, data.sik, data.app_id, data.data))
 
 
 @rest('/topdesk-data', 'post', silent_result=True)
