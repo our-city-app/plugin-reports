@@ -116,8 +116,7 @@ def send_notification(notification, settings, incident):
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
     assert isinstance(incident.integration_params, IntegrationParamsGreenValley)
     server_url = get_server_url()
-    unescaped = HTMLParser().unescape(notification.message)
-    message = html_to_markdown(unescaped)
+    message = notification.message.strip()
     if not message:
         return
     attachments = []

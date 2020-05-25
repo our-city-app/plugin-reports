@@ -364,6 +364,7 @@ def remove_gv_integration(integration_id, topic):
 
 def handle_message_received(integration_id, notification):
     # type: (int, GVExternalNotification) -> None
+    logging.debug('Received notification from Green Valley: %s', notification)
     if not notification.caseReference:
         logging.debug(notification)
         raise Exception('No caseReference set for notification!')
@@ -376,8 +377,12 @@ def handle_message_received(integration_id, notification):
         incident.put()
     if incident.user_id and notification.id not in incident.integration_params.notification_ids:
         incident.integration_params.notification_ids.append(notification.id)
-        send_notification(notification, integration_settings, incident)
+        if len(incident.integration_params.notification_ids) > 1:
+            # Don't send initial message (this will contain the stuff the user has sent in, so there's no point in sending that to the user)
+            send_notification(notification, integration_settings, incident)
         incident.put()
+    else:
+        logging.debug('Not sending notification')
 
 
 def create_incident_from_gv_notification(integration_settings, notification):
@@ -430,7 +435,8 @@ def get_user_email_from_oca_context(context):
     url = base_url + '/mobi/rest/user/context/' + context
     result = urlfetch.fetch(url)  # type: urlfetch._URLFetchResult
     if result.status_code == 200:
-        return json.loads(result)['id']
+        data = json.loads(result.content)
+        return data['id']
     if result.status_code != 404:
         logging.debug('%s: %s', result.status_code, result.content)
         raise Exception('Unexpected status code %s for context request' % result.status_code)
