@@ -390,15 +390,16 @@ def create_incident_from_gv_notification(integration_settings, notification):
     user_id = None
     if notification.ocaContext:
         # Resolve user id from ocaContext
-        user_email = get_user_email_from_oca_context(notification.ocaContext)
-        if user_email:
-            user_id = create_app_user_by_email(user_email, integration_settings.app_id).email()
+        app_user = get_app_user_from_oca_context(notification.ocaContext)
+        if app_user:
+            user_id = app_user.email()
             rt_user = get_rogerthat_user(user_id)
             if not rt_user:
+                user_email, app_id = get_app_user_tuple_by_email(user_id)
                 rt_user = RogerthatUser(key=RogerthatUser.create_key(user_id))
-                rt_user.email = user_id
+                rt_user.email = user_email.email()
                 rt_user.name = '%s %s' % (notification.firstName, notification.lastName)
-                rt_user.app_id = integration_settings.app_id
+                rt_user.app_id = app_id
                 rt_user.put()
 
     result_xml = _execute_gv_request(integration_settings.data, '/cases/' + notification.caseReference, urlfetch.GET)
@@ -429,14 +430,14 @@ def _get_incident_details_from_xml(elements):
     return details
 
 
-def get_user_email_from_oca_context(context):
-    # type: (str) -> Optional[str]
+def get_app_user_from_oca_context(context):
+    # type: (str) -> Optional[users.User]
     base_url = get_config(ROGERTHAT_NAMESPACE).rogerthat_server_url
     url = base_url + '/mobi/rest/user/context/' + context
     result = urlfetch.fetch(url)  # type: urlfetch._URLFetchResult
     if result.status_code == 200:
         data = json.loads(result.content)
-        return data['id']
+        return users.User(data['id'])
     if result.status_code != 404:
         logging.debug('%s: %s', result.status_code, result.content)
         raise Exception('Unexpected status code %s for context request' % result.status_code)
@@ -453,3 +454,12 @@ def create_app_user_by_email(human_user_email, app_id=None):
     if app_id != 'rogerthat':
         return users.User('%s:%s' % (human_user_email, app_id))
     return users.User(human_user_email)
+
+
+def get_app_user_tuple_by_email(app_user_email):
+    azzert('/' not in app_user_email, "app_user_email should not contain /")
+    if ':' in app_user_email:
+        human_user_email, app_id = app_user_email.split(':')
+    else:
+        human_user_email, app_id = app_user_email, 'rogerthat'
+    return users.User(human_user_email), app_id
