@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, forwardRef } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { environment } from '../../../../framework/client/environments/environment';
 import { GreenValleySettings } from '../../interfaces';
 
 @Component({
@@ -17,6 +18,7 @@ export class GreenValleySettingsComponent implements ControlValueAccessor {
   private onChange: Function;
   private onTouched: Function;
   settings: GreenValleySettings | null = null;
+  proxies = environment.configuration.plugins.reports.gv_proxies;
 
   constructor(private changeDetectorRef: ChangeDetectorRef) {
   }

@@ -98,6 +98,8 @@ export interface GreenValleySettings {
   provider: IntegrationProvider.GREEN_VALLEY;
   username: string;
   password: string;
+  topic: string;
+  proxy_id: string;
   base_url: string;
   realm: string;
   gateway_client_id: string;

@@ -17,14 +17,20 @@
 from __future__ import unicode_literals
 
 from plugins.rogerthat_api.to import PaginatedResultTO, UserDetailsTO
+from typing import List
 from .forms import *
+
+
+class GVProxy(TO):
+    id = unicode_property('id')
+    url = unicode_property('url')
+    secret = unicode_property('secret')
 
 
 class ReportsPluginConfiguration(TO):
     google_maps_key = unicode_property('google_maps_key')
     oca_server_secret = unicode_property('oca_server_secret')
-    gv_activemq_proxy_url = unicode_property('gv_activemq_proxy_url')
-    gv_activemq_proxy_secret = unicode_property('gv_activemq_proxy_secret')
+    gv_proxies = typed_property('gv_proxies', GVProxy, True)  # type: List[GVProxy]
 
 
 class GeoPointTO(TO):

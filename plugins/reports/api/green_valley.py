@@ -27,16 +27,17 @@ from plugins.reports.models import IntegrationSettings, IntegrationProvider
 
 def validate_request(f, handler):
     auth = handler.request.headers.get('Authorization', None)
-    return auth == get_config(NAMESPACE).gv_activemq_proxy_secret
+    config = get_config(NAMESPACE)
+    return any(proxy.secret == auth for proxy in config.gv_proxies)
 
 
-@rest('/green-valley/topics', 'get', silent_result=True)
+@rest('/green-valley/topics/<proxy_id:[^/]+>', 'get', silent_result=True)
 @returns([dict])
-@arguments()
-def api_get_topics():
+@arguments(proxy_id=unicode)
+def api_get_topics(proxy_id):
     integrations = IntegrationSettings.list_by_integration(IntegrationProvider.GREEN_VALLEY)
     return [{'integration_id': integration.id, 'name': integration.data.topic}
-            for integration in integrations if integration.data.topic]
+            for integration in integrations if integration.data.proxy_id == proxy_id and integration.data.topic]
 
 
 @rest('/green-valley/message/<integration_id:[^/]+>', 'post', silent_result=True, custom_auth_method=validate_request)

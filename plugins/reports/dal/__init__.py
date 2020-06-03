@@ -56,10 +56,10 @@ def save_integration_settings(integration_id, rogerthat_api_key, name, consumer_
     if isinstance(data, GreenValleySettings):
         from plugins.reports.integrations.int_green_valley.green_valley import register_new_gv_integration, \
             remove_gv_integration
-        if data.topic and settings.data.topic != data.topic:
-            tasks.append(create_task(register_new_gv_integration, integration_id, data.topic))
+        if data.topic and (not settings.data or settings.data.topic != data.topic):
+            tasks.append(create_task(register_new_gv_integration, integration_id, data.topic, data.proxy_id))
         if isinstance(settings.data, GreenValleySettings) and settings.data.topic and settings.data.topic != data.topic:
-            tasks.append(create_task(remove_gv_integration, integration_id, settings.data.topic))
+            tasks.append(create_task(remove_gv_integration, integration_id, settings.data.topic, data.proxy_id))
     settings.data = data
     ndb.put_multi([settings, rogerthat_settings, consumer])
     schedule_tasks(tasks)

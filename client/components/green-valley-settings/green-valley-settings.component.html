@@ -8,6 +8,16 @@
     <input name="password" matInput [(ngModel)]="settings.password" (ngModelChange)="changed()">
   </mat-form-field>
   <mat-form-field>
+    <mat-label>Topic</mat-label>
+    <input name="topic" matInput [(ngModel)]="settings.topic" (ngModelChange)="changed()">
+  </mat-form-field>
+  <mat-form-field>
+    <mat-label>Proxy id</mat-label>
+    <mat-select required [(ngModel)]="settings.proxy_id" (ngModelChange)="changed()" name="proxy_id">
+      <mat-option *ngFor="let proxy of proxies" [value]="proxy.id">{{ proxy.id }}</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field>
     <mat-label>Base url</mat-label>
     <input name="base_url" matInput [(ngModel)]="settings.base_url" (ngModelChange)="changed()">
   </mat-form-field>

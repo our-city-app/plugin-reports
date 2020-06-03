@@ -41,7 +41,7 @@ from plugins.reports.models.green_valley import GvMappingFlex, GreenValleyFormCo
     GvMappingLocation, GvMappingPerson, GvMappingField, GvMappingConst, GvMappingConsent
 from plugins.reports.to import FormSubmissionTO, FieldComponentTO, DynamicFormTO, TextInputComponentValueTO, \
     MultiSelectComponentValueTO, SingleSelectComponentValueTO, LocationComponentValueTO, \
-    FileComponentValueTO, MultiSelectComponentTO, ValueTO
+    FileComponentValueTO, MultiSelectComponentTO, ValueTO, ReportsPluginConfiguration
 from plugins.rogerthat_api.plugin_consts import NAMESPACE as ROGERTHAT_NAMESPACE
 from typing import Optional
 
@@ -335,9 +335,15 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
     return True
 
 
-def _request(integration_id, topic, command):
-    config = get_config(NAMESPACE)
-    url = '%s/topics' % config.gv_activemq_proxy_url
+def _request(integration_id, proxy_id, topic, command):
+    config = get_config(NAMESPACE)  # type: ReportsPluginConfiguration
+    for proxy in config.gv_proxies:
+        if proxy.id == proxy_id:
+            break
+    else:
+        logging.error('No proxy found for id \'%s\'', proxy_id)
+        return
+    url = '%s/topics' % proxy.url
     payload = {
         'topic': topic,
         'integration_id': integration_id,
@@ -345,7 +351,7 @@ def _request(integration_id, topic, command):
     }
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': config.gv_activemq_proxy_secret
+        'Authorization': proxy.secret
     }
     result = urlfetch.fetch(url, json.dumps(payload), method=urlfetch.POST,
                             headers=headers)  # type: urlfetch._URLFetchResult
@@ -354,12 +360,12 @@ def _request(integration_id, topic, command):
         raise Exception('Could not send command %s for topic %s' % (command, topic))
 
 
-def register_new_gv_integration(integration_id, topic):
-    _request(integration_id, topic, 'subscribe')
+def register_new_gv_integration(integration_id, topic, proxy_id):
+    _request(integration_id, proxy_id, topic, 'subscribe')
 
 
-def remove_gv_integration(integration_id, topic):
-    _request(integration_id, topic, 'unsubscribe')
+def remove_gv_integration(integration_id, topic, proxy_id):
+    _request(integration_id, proxy_id, topic, 'unsubscribe')
 
 
 def handle_message_received(integration_id, notification):

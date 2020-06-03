@@ -101,14 +101,12 @@ class GreenValleySettings(TO):
     provider = unicode_property('provider', default=IntegrationProvider.GREEN_VALLEY)
     username = unicode_property('username')
     password = unicode_property('password')
+    proxy_id = unicode_property('proxy_id')
+    topic = unicode_property('topic')
     base_url = unicode_property('base_url')
     realm = unicode_property('realm')
     gateway_client_id = unicode_property('gateway_client_id')
     gateway_client_secret = unicode_property('gateway_client_secret')
-
-    @property
-    def topic(self):
-        return '/topic/%s.communication.release.notification.topic' % self.realm.replace('-', '_') if self.realm else None
 
 
 INTEGRATION_SETTINGS_MAPPING = {

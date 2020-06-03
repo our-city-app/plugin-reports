@@ -111,6 +111,8 @@ export class IntegrationSettingsComponent implements OnInit, OnChanges {
             username: 'OSA',
             password: '',
             base_url: 'https://suite-*********.onlinesmartcities.be',
+            proxy_id: 'production',
+            topic: '/topic/**********.communication.prod.notification.topic',
             realm: 'suite-********',
             gateway_client_id: 'osa',
             gateway_client_secret: '',
