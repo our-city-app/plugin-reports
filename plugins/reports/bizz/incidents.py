@@ -23,6 +23,8 @@ from dateutil.parser import parse as parse_date
 from google.appengine.ext import ndb
 from typing import List, Tuple
 
+from plugins.reports.integrations.int_topdesk.models import TOPDeskFormConfiguration
+from plugins.reports.integrations.int_topdesk.topdesk import create_topdesk_incident_from_form
 from framework.bizz.job import run_job, MODE_BATCH
 from framework.utils import try_or_defer
 from mcfw.exceptions import HttpBadRequestException
@@ -31,7 +33,7 @@ from plugins.reports.bizz.elasticsearch import re_index_incidents, re_index_inci
 from plugins.reports.dal import save_rogerthat_user, get_rogerthat_user, get_integration_settings
 from plugins.reports.integrations.int_3p import create_incident as create_3p_incident
 from plugins.reports.integrations.int_green_valley.green_valley import create_incident as create_gv_incident
-from plugins.reports.integrations.int_topdesk import create_incident as create_topdesk_incident
+from plugins.reports.integrations.int_topdesk.msgflow import create_incident as create_topdesk_incident
 from plugins.reports.models import Incident, IntegrationProvider, IncidentParamsFlow, IncidentParamsForm, \
     FormIntegration, GreenValleyFormConfiguration, IncidentStatus
 from plugins.reports.to import FormSubmittedCallback
@@ -122,6 +124,9 @@ def create_incident_from_form(integration_id, data):
     integration = get_integration_settings(integration_id)
     if isinstance(form_configuration.config, GreenValleyFormConfiguration):
         created = create_gv_incident(integration.data, form_configuration.config, data.submission, data.form, incident)
+    elif isinstance(form_configuration.config, TOPDeskFormConfiguration):
+        created = create_topdesk_incident_from_form(integration, form_configuration.config, data.submission,
+                                                    data.form, incident, rt_user)
     else:
         raise HttpBadRequestException()
     if created:

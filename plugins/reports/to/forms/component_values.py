@@ -16,17 +16,20 @@
 # limitations under the License.
 #
 # @@license_version:1.6@@
-
-from datetime import datetime
-
-from mcfw.properties import unicode_property, float_property, long_property, unicode_list_property, typed_property
+import urllib
+from datetime import datetime, time
 
 from framework.to import TO
-from .enums import FormComponentType
+from mcfw.properties import unicode_property, float_property, long_property, unicode_list_property, typed_property
+from .components import FieldComponentTO, TextInputComponentTO, SingleSelectComponentTO, MultiSelectComponentTO, \
+    DatetimeComponentTO, \
+    FileComponentTO, LocationComponentTO
+from .enums import FormComponentType, DateFormat
 
 
 class BaseComponentValue(object):
-    def get_string_value(self):
+    def get_string_value(self, component):
+        # type: (FieldComponentTO) -> str
         raise NotImplementedError()
 
 
@@ -38,19 +41,25 @@ class FieldComponentValueTO(TO):
 class TextInputComponentValueTO(FieldComponentValueTO, BaseComponentValue):
     value = unicode_property('value')
 
-    def get_string_value(self):
-        return self.value
+    def get_string_value(self, component):
+        # type: (TextInputComponentTO) -> str
+        return self.value or ''
 
 
 class SingleSelectComponentValueTO(TextInputComponentValueTO, BaseComponentValue):
-    pass
+    def get_string_value(self, component):
+        # type: (SingleSelectComponentTO) -> str
+        choices_map = {choice.value: choice.label for choice in component.choices}
+        return choices_map.get(self.value, self.value)
 
 
 class MultiSelectComponentValueTO(FieldComponentValueTO, BaseComponentValue):
     values = unicode_list_property('values')
 
-    def get_string_value(self):
-        return ', '.join(self.values)
+    def get_string_value(self, component):
+        # type: (MultiSelectComponentTO) -> str
+        choices_map = {choice.value: choice.label for choice in component.choices}
+        return ', '.join([choices_map.get(val, val) for val in self.values])
 
 
 class DatetimeValueTO(TO):
@@ -63,11 +72,18 @@ class DatetimeValueTO(TO):
 
 class DatetimeComponentValueTO(FieldComponentValueTO, DatetimeValueTO, BaseComponentValue):
 
-    def get_date(self):
-        return datetime(self.year, self.month, self.day, self.hour, self.minute)
-
-    def get_string_value(self, fmt='%d/%m/%Y %H:%M'):
-        return self.get_date().strftime(fmt)
+    def get_string_value(self, component):
+        # type: (DatetimeComponentTO) -> str
+        if component.format == DateFormat.DATE:
+            fmt = '%d/%m/%Y'
+            date = datetime(self.year, self.month, self.day)
+        elif component.format == DateFormat.TIME:
+            fmt = '%H:%M'
+            date = time(self.hour, self.minute)
+        else:
+            fmt = '%d/%m/%Y %H:%M'
+            date = datetime(self.year, self.month, self.day, self.hour, self.minute)
+        return date.strftime(fmt)
 
 
 class FileComponentValueTO(FieldComponentValueTO, BaseComponentValue):
@@ -78,7 +94,8 @@ class FileComponentValueTO(FieldComponentValueTO, BaseComponentValue):
     def to_statistics(self):
         return [self.value, self.name, self.file_type]
 
-    def get_string_value(self):
+    def get_string_value(self, component):
+        # type: (FileComponentTO) -> str
         return self.value
 
     @classmethod
@@ -102,11 +119,23 @@ class LocationComponentValueTO(FieldComponentValueTO, BaseComponentValue):
     longitude = float_property('longitude')
     address = typed_property('address', PostalAddressTO, default=None)  # type: PostalAddressTO
 
-    def get_string_value(self):
-        return ', '.join(self.address.address_lines) if self.address else '%s,%s' % (self.latitude, self.longitude)
+    def get_string_value(self, component):
+        # type: (LocationComponentTO) -> str
+        latlon = '%s,%s' % (self.latitude, self.longitude)
+        if self.address:
+            return ', '.join(self.address.address_lines) + ' | %s' % latlon
+        return latlon
 
     def to_statistics(self):
         return [self.latitude, self.longitude]
+
+    def get_maps_url(self):
+        query = '%s,%s' % (self.latitude, self.longitude)
+        params = {
+            'api': 1,
+            'query': query,
+        }
+        return 'https://www.google.com/maps/search/?' + urllib.urlencode(params, doseq=True)
 
     @classmethod
     def from_statistics(cls, stats):

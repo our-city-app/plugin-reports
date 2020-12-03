@@ -21,12 +21,18 @@ import webapp2
 
 from framework.utils import try_or_defer
 from plugins.reports.dal import get_consumer
-from plugins.reports.integrations.int_topdesk import incident_feedback
+from plugins.reports.integrations.int_topdesk.callbacks import incident_feedback
 
 
 class TopdeskCallbackHandler(webapp2.RequestHandler):
 
     def post(self):
+        # The topdesk server should send the following info in the body:
+        # {
+        #   "uid": "${unid}",
+        #   "id": "${naam}",
+        #   "message": "${(_progresstrail.actions_visible?first.plaintext)!}"
+        # }
         auth_header = self.request.headers.get('Authorization', '')
         consumer = get_consumer(auth_header)
         if not consumer:

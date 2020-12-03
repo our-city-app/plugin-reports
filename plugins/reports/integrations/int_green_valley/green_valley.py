@@ -179,8 +179,6 @@ def create_incident(gv_settings, form_configuration, submission, form, incident)
     original_form_mapping = {section.id: {component.id: component for component in section.components if
                                           isinstance(component, FieldComponentTO)}
                              for section in form.sections}
-    if submission:
-        pass
     gv_mapping = {section.id: section.components for section in form_configuration.mapping}
     flexes = []
     person = {}

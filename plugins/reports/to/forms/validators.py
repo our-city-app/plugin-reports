@@ -19,7 +19,6 @@
 from mcfw.properties import object_factory, long_property, unicode_property
 
 from framework.to import TO
-from .component_values import DatetimeValueTO
 
 
 class FormValidatorType(object):
@@ -50,8 +49,12 @@ class MaxValidatorTO(_Validator):
     value = long_property('value')
 
 
-class DateValidatorTO(_Validator, DatetimeValueTO):
-    pass
+class DateValidatorTO(_Validator):
+    day = long_property('day')
+    month = long_property('month')
+    year = long_property('year')
+    hour = long_property('hour')
+    minute = long_property('minute')
 
 
 class MinDateValidatorTO(DateValidatorTO):

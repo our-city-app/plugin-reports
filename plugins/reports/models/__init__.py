@@ -27,6 +27,7 @@ from framework.to import TO
 from mcfw.properties import unicode_property, object_factory, unicode_list_property, long_property, bool_property, \
     typed_property
 from plugins.reports.consts import NAMESPACE
+from plugins.reports.integrations.int_topdesk.models import TOPDeskFormConfiguration
 from plugins.reports.models.green_valley import GreenValleyFormConfiguration
 from plugins.rogerthat_api.plugin_utils import Enum
 from plugins.rogerthat_api.to.messaging.flow import FLOW_STEP_TO
@@ -140,6 +141,7 @@ class IncidentParamsFlow(TO):
 class IncidentParamsForm(TO):
     t = long_property('t', default=IncidentSource.FORM)
     submission_id = long_property('submission_id')
+    parent_message_key = unicode_property('parent_message_key', default=None)
 
 
 INCIDENT_PARAMS_MAPPING = {
@@ -188,7 +190,8 @@ class IntegrationParams(object_factory):
 
 
 FORM_INTEGRATION_CONFIG_MAPPING = {
-    IntegrationProvider.GREEN_VALLEY: GreenValleyFormConfiguration
+    IntegrationProvider.GREEN_VALLEY: GreenValleyFormConfiguration,
+    IntegrationProvider.TOPDESK: TOPDeskFormConfiguration,
 }
 
 

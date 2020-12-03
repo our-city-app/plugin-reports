@@ -23,7 +23,7 @@ from google.appengine.ext import ndb
 from dateutil.relativedelta import relativedelta
 from framework.bizz.job import run_job
 from framework.utils.cloud_tasks import schedule_tasks, create_task
-from plugins.reports.integrations.int_topdesk import refresh_topdesk_tags
+from plugins.reports.integrations.int_topdesk.stats import refresh_topdesk_tags
 from plugins.reports.models import Incident, IncidentStatus, IntegrationSettings, IntegrationProvider
 from plugins.reports.models.incident_statistics import IncidentStatistics, IncidentTagMapping
 from typing import List, Dict

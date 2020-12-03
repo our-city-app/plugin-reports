@@ -238,7 +238,7 @@ class IncidentListTO(PaginatedResultTO):
 
 class FormSubmissionTO(TO):
     id = long_property('id')
-    sections = typed_property('sections', FormSectionValueTO, True)
+    sections = typed_property('sections', FormSectionValueTO, True)  # type: List[FormSectionValueTO]
     submitted_date = unicode_property('submitted_date')
     version = long_property('version')
     external_reference = typed_property('external_reference', dict)

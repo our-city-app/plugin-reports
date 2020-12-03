@@ -19,6 +19,7 @@
 from mcfw.properties import long_property, unicode_property, typed_property, object_factory, bool_property
 
 from framework.to import TO
+from typing import List
 from .component_values import FORM_COMPONENT_VALUES
 from .components import FormComponentTO, NextActionTO
 
@@ -60,13 +61,13 @@ class FormComponentValueTO(object_factory):
 
 class FormSectionValueTO(TO):
     id = unicode_property('id')
-    components = typed_property('components', FormComponentValueTO(), True)  # type: list[FormComponentValueTO]
+    components = typed_property('components', FormComponentValueTO(), True)  # type: List[FormComponentValueTO]
 
 
 class DynamicFormValueTO(TO):
     id = long_property('id')
     version = long_property('version')
-    sections = typed_property('sections', FormSectionValueTO, True)  # type: list[FormSectionValueTO]
+    sections = typed_property('sections', FormSectionValueTO, True)  # type: List[FormSectionValueTO]
 
 
 class FormSubmittedCallbackResultTO(TO):

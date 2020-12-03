@@ -19,10 +19,9 @@
 
 from __future__ import unicode_literals
 
-from mcfw.properties import typed_property, unicode_property, unicode_list_property, object_factory, \
-    bool_property
-
 from framework.to import TO
+from mcfw.properties import typed_property, unicode_property, unicode_list_property, object_factory, bool_property
+from typing import List
 from .enums import FormComponentType, DateFormat, KeyboardType
 from .validators import FormValidatorTO, FormValidatorType
 
@@ -39,7 +38,7 @@ class FieldComponentTO(ParagraphComponentTO):
 
 
 class ValidatedComponentTO(TO):
-    validators = typed_property('validators', FormValidatorTO(), True, default=[])  # type: list[FormValidatorTO]
+    validators = typed_property('validators', FormValidatorTO(), True, default=[])  # type: List[FormValidatorTO]
 
 
 class TextInputComponentTO(FieldComponentTO, ValidatedComponentTO):
@@ -100,7 +99,7 @@ class ValueTO(TO):
 
 
 class SelectComponentTO(FieldComponentTO, ValidatedComponentTO):
-    choices = typed_property('choices', ValueTO, True)  # type: list[ValueTO]
+    choices = typed_property('choices', ValueTO, True)  # type: List[ValueTO]
 
 
 class SingleSelectComponentTO(SelectComponentTO):

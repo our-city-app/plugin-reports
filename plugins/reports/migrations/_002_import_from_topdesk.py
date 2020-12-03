@@ -20,7 +20,8 @@ from google.appengine.api.taskqueue import MAX_TASKS_PER_ADD
 from framework.bizz.job import run_job
 from framework.consts import HIGH_LOAD_WORKER_QUEUE
 from framework.utils.cloud_tasks import create_task, schedule_tasks
-from plugins.reports.integrations.int_topdesk import topdesk_api_call, create_or_update_incident_from_topdesk
+from plugins.reports.integrations.int_topdesk import topdesk_api_call
+from plugins.reports.integrations.int_topdesk.feedback import create_or_update_incident_from_topdesk
 from plugins.reports.models import IntegrationSettings, IntegrationProvider
 
 

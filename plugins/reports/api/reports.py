@@ -15,6 +15,7 @@
 #
 # @@license_version:1.5@@
 import logging
+from collections import defaultdict
 
 from dateutil import parser
 from mcfw.exceptions import HttpForbiddenException, HttpNotFoundException, HttpBadRequestException
@@ -23,6 +24,7 @@ from mcfw.rpc import returns, arguments
 from plugins.reports.bizz.incident_statistics import get_all_incident_statistics, get_incident_statistics
 from plugins.reports.bizz.incidents import list_incidents, create_incident_from_form
 from plugins.reports.dal import get_consumer, get_incident, update_incident
+from plugins.reports.integrations.int_topdesk.topdesk import topdesk_integration_call
 from plugins.reports.models import FormIntegration, SaveFormIntegrationTO, IncidentStatus
 from plugins.reports.to import IncidentListTO, IncidentTO, FormSubmittedCallback
 
@@ -128,3 +130,24 @@ def api_form_callback(form_id, data):
     # type: (int, FormSubmittedCallback) -> str
     consumer = _get_consumer()
     return {'external_reference': create_incident_from_form(consumer.integration_id, data)}
+
+
+@rest('/integrations/topdesk/categories', 'get', silent_result=True)
+@returns([dict])
+@arguments()
+def api_get_topdesk_categories():
+    return topdesk_integration_call(_get_consumer().integration_id, '/incidents/categories')
+
+
+@rest('/integrations/topdesk/subcategories', 'get', silent_result=True)
+@returns([dict])
+@arguments()
+def api_get_topdesk_subcategories():
+    data = topdesk_integration_call(_get_consumer().integration_id, '/incidents/subcategories')
+    # Convert from flat list with duplicated category info to list of categories with subcategories
+    per_category = defaultdict(list)
+    categories = {entry['category']['id']: entry['category']['name'] for entry in data}
+    for entry in data:
+        per_category[entry['category']['id']].append({'id': entry['id'], 'name': entry['name']})
+    return [{'id': category_id, 'name': categories[category_id], 'subcategories': subcategories}
+            for category_id, subcategories in per_category.iteritems()]
