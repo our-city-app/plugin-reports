@@ -285,7 +285,8 @@ def create_topdesk_incident_from_form(config, form_configuration, submission, fo
                         new_incident_data[TopdeskPropertyName.SUB_CATEGORY]['id'] = selected_sub_category
                         processed_components.add(component_id)
                     else:
-                        logging.debug('Could not find selected subcategory %s for mapping %s', mapping)
+                        logging.debug('Could not find selected subcategory %s for mapping %s', component_value.value,
+                                      mapping)
             elif isinstance(mapping, TOPDeskBriefDescriptionMapping):
                 brief_description = _get_brief_description(component_def, component_value)
                 if brief_description:

@@ -39,7 +39,7 @@ class TOPDeskSubCategoryMapping(BaseComponent):
 
 
 class TOPDeskBriefDescriptionMapping(BaseComponent):
-    type = unicode_property('type', default=TopdeskPropertyName.SUB_CATEGORY)
+    type = unicode_property('type', default=TopdeskPropertyName.BRIEF_DESCRIPTION)
     # No special options for now
 
 
