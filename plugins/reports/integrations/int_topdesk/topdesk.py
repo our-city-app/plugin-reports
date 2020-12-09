@@ -203,24 +203,25 @@ def _download(url):
     return str(response.content)
 
 
-def _maybe_resize_image(image):
+def _maybe_resize_image(image, content_type):
     img_file = StringIO(image)
     img = Image.open(img_file)
     width, height = img.size
     max_width = 2560
     if width < max_width:
-        return image
+        return image, content_type
     new_height = int(float(height) / float(width) * max_width)
     result_image = img.resize((max_width, new_height))  # type: Image.Image
     result = StringIO()
     result_image.save(result, 'jpeg')
-    return result.getvalue()
+    return result.getvalue(), 'image/jpeg'
 
 
-def upload_attachment(integration_id, topdesk_incident_id, url, file_name, content_type='image/jpeg'):
+def upload_attachment(integration_id, topdesk_incident_id, url, file_name, content_type):
     file_content = _download(url)
 
-    file_content = _maybe_resize_image(file_content)
+    if content_type.startswith('image'):
+        file_content, content_type = _maybe_resize_image(file_content, content_type)
     payload, payload_content_type = encode_multipart_formdata([
         ('file', (file_name, file_content, content_type)),
     ])
@@ -359,7 +360,7 @@ def create_topdesk_incident_from_form(config, form_configuration, submission, fo
     logging.debug('Result from server: %s', response)
 
     for attachment in attachments:
-        deferred.defer(upload_attachment, topdesk_settings.id, response['id'], attachment.value,
+        deferred.defer(upload_attachment, config.id, response['id'], attachment.value,
                        attachment.name, attachment.file_type)
 
     integration_params = IntegrationParamsTopdesk()

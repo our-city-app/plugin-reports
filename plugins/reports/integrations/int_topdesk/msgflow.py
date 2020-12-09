@@ -126,7 +126,7 @@ def create_incident(config, rt_user, incident, steps):
     count = 0
     for url in attachments:
         count += 1
-        deferred.defer(upload_attachment, config.id, response['id'], url, 'foto-%s.jpg' % count)
+        deferred.defer(upload_attachment, config.id, response['id'], url, 'foto-%s.jpg' % count, 'image/jpeg')
 
     incident.details = incident_details
     integration_params = IntegrationParamsTopdesk()
