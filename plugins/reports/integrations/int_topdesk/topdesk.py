@@ -37,7 +37,7 @@ from plugins.reports.integrations.int_topdesk.models import TOPDeskFormConfigura
     BaseComponent, TOPDeskSubCategoryMapping, TOPDeskBriefDescriptionMapping, TOPDeskOptionalFields1Mapping, \
     TOPDeskOptionalFields2Mapping, OptionalFieldLocationOptions, OptionalFieldLocationFormat
 from plugins.reports.models import TopdeskSettings, RogerthatUser, Incident, IncidentDetails, IdName, \
-    IntegrationParamsTopdesk, IntegrationSettings, IntegrationProvider, IncidentParamsForm, FormIntegration
+    IntegrationParamsTopdesk, IntegrationSettings, IntegrationProvider, IncidentParamsForm
 from plugins.reports.to import FormSubmissionTO, DynamicFormTO, FieldComponentTO, SingleSelectComponentValueTO, \
     BaseComponentValue, LocationComponentValueTO, FileComponentValueTO
 from plugins.rogerthat_api.to import MemberTO
@@ -223,7 +223,7 @@ def upload_attachment(integration_id, topdesk_incident_id, url, file_name, conte
     if content_type.startswith('image'):
         file_content, content_type = _maybe_resize_image(file_content, content_type)
     payload, payload_content_type = encode_multipart_formdata([
-        ('file', (file_name, file_content, content_type)),
+        ('file', (file_name.replace(' ', '_').replace(':', '-'), file_content, content_type)),
     ])
     settings = get_integration_settings(integration_id).data
     headers = _get_headers(settings.username, settings.password)  # todo fix
@@ -359,9 +359,9 @@ def create_topdesk_incident_from_form(config, form_configuration, submission, fo
     response = topdesk_api_call(topdesk_settings, '/api/incidents', urlfetch.POST, new_incident_data)
     logging.debug('Result from server: %s', response)
 
-    for attachment in attachments:
+    for i, attachment in enumerate(attachments):
         deferred.defer(upload_attachment, config.id, response['id'], attachment.value,
-                       attachment.name, attachment.file_type)
+                       'attachment-%d' % i, attachment.file_type)
 
     integration_params = IntegrationParamsTopdesk()
     integration_params.status = IdName.from_dict(response['processingStatus'])
