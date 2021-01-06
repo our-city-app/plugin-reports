@@ -375,7 +375,7 @@ def create_topdesk_incident_from_form(config, form_configuration, submission, fo
         submission_id=submission.id,
     )
     # Add countdown to ensure this runs after incident is saved to datastore
-    deferred.defer(_send_confirmation_message, incident.integration_id, config.sik, submission, form, rt_user, guid(),
+    deferred.defer(_send_confirmation_message, incident.id, incident.integration_id, submission, form, rt_user, guid(),
                    _countdown=5)
     return True
 
@@ -386,6 +386,7 @@ def _send_confirmation_message(incident_id, integration_id, submission, form, rt
     keys = [Incident.create_key(incident_id), IntegrationSettings.create_key(integration_id)]
     incident, integration_settings = ndb.get_multi(keys)  # type: Incident, IntegrationSettings
     if not incident:
+        logging.debug('Not sending confirmation message: incident %s does not exist', incident_id)
         return
     member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
     summary_lines = []
@@ -401,7 +402,10 @@ def _send_confirmation_message(incident_id, integration_id, submission, form, rt
             if not component_def:
                 continue
             summary_lines.append('**%s**' % component_def.title.strip())
-            summary_lines.append(component.get_string_value(component_def))
+            if isinstance(component, FileComponentValueTO):
+                summary_lines.append('[%s](%s)' % (component.name, component.value))
+            else:
+                summary_lines.append(component.get_string_value(component_def))
             summary_lines.append('')
     complete_message = 'We hebben uw melding goed ontvangen. ' \
                        'Indien er updates zijn zullen we u via dit bericht op de hoogte houden. ' \

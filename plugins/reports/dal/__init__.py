@@ -16,7 +16,6 @@
 # @@license_version:1.5@@
 from google.appengine.ext import ndb
 
-
 from framework.utils.cloud_tasks import schedule_tasks, create_task
 from mcfw.exceptions import HttpNotFoundException
 from plugins.reports.bizz.elasticsearch import re_index_incident

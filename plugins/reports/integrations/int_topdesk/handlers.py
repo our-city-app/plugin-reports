@@ -43,9 +43,9 @@ class TopdeskCallbackHandler(webapp2.RequestHandler):
 
         logging.debug('Body: %s', self.request.body)
         data = json.loads(self.request.body) if self.request.body else {}
-        incident_id = data.get('id')
+        incident_id = data.get('uid') or data.get('id')
         if not incident_id:
-            logging.error('Received callback from topdesk without an id')
+            logging.error('Received callback from topdesk without an id or uid')
             self.response.set_status(400)
             return
         message = data.get('message')

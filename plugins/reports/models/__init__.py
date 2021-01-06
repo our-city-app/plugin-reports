@@ -72,7 +72,7 @@ class TypeMapping(TO):
 
 
 class TopdeskReportSettings(TO):
-    type_fields = typed_property('type_field', TypeMapping, True)  # type: List[TypeMapping]
+    type_fields = typed_property('type_field', TypeMapping, True, default=[])  # type: List[TypeMapping]
 
 
 class TopdeskSettings(TO):
@@ -90,7 +90,7 @@ class TopdeskSettings(TO):
     branch_id = unicode_property('branch_id')
     unregistered_users = bool_property('unregistered_users')
     field_mapping = typed_property('field_mapping', TopdeskfieldMapping, True)  # type: List[TopdeskfieldMapping]
-    report_settings = typed_property('report_settings', TopdeskReportSettings)  # type: TopdeskReportSettings
+    report_settings = typed_property('report_settings', TopdeskReportSettings, default=None)  # type: TopdeskReportSettings
 
 
 class ThreePSettings(TO):

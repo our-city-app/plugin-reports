@@ -123,7 +123,7 @@ class LocationComponentValueTO(FieldComponentValueTO, BaseComponentValue):
         # type: (LocationComponentTO) -> str
         latlon = '%s,%s' % (self.latitude, self.longitude)
         if self.address:
-            return ', '.join(self.address.address_lines) + ' | %s' % latlon
+            return ', '.join(self.address.address_lines)
         return latlon
 
     def to_statistics(self):

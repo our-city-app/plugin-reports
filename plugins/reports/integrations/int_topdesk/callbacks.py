@@ -14,7 +14,9 @@
 # limitations under the License.
 #
 # @@license_version:1.5@@
+from __future__ import unicode_literals
 import logging
+import urllib
 from urlparse import urlparse, parse_qs
 from uuid import uuid4
 
@@ -22,6 +24,7 @@ from google.appengine.ext import ndb
 
 import dateutil
 from framework.utils import try_or_defer, guid
+from mcfw.consts import MISSING
 from plugins.reports.bizz.elasticsearch import re_index_incident
 from plugins.reports.bizz.rogerthat import send_rogerthat_message
 from plugins.reports.consts import IncidentTagType
@@ -30,7 +33,7 @@ from plugins.reports.integrations.int_green_valley.notifications import html_to_
 from plugins.reports.integrations.int_topdesk.consts import TopdeskFieldMappingType
 from plugins.reports.integrations.int_topdesk.topdesk import topdesk_api_call
 from plugins.reports.models import IdName, IncidentParamsFlow, IntegrationParamsTopdesk, TopdeskSettings, \
-    IncidentDetails, Incident, IncidentStatus, IncidentTag
+    IncidentDetails, Incident, IncidentStatus, IncidentTag, IncidentParamsForm
 from plugins.rogerthat_api.to import MemberTO
 
 
@@ -43,7 +46,13 @@ def incident_feedback(integration_id, incident_id, message):
         return
 
     topdesk_settings = settings.data  # type: TopdeskSettings
-    response = topdesk_api_call(topdesk_settings, '/api/incidents/number/%s' % incident_id)
+    if len(incident_id) == 36:
+        # uuid -> get by id
+        response = topdesk_api_call(topdesk_settings, '/api/incidents/id/%s' % incident_id)
+    else:
+        # case number -> get by number
+        urlencoded = urllib.quote(incident_id)
+        response = topdesk_api_call(topdesk_settings, '/api/incidents/number/%s' % urlencoded)
     logging.debug("Incident result from server: %s", response)
 
     incident = create_or_update_incident_from_topdesk(integration_id, topdesk_settings, response)
@@ -68,7 +77,7 @@ def incident_feedback(integration_id, incident_id, message):
             rt_user = get_rogerthat_user(incident.user_id)
             member = MemberTO(member=rt_user.email, app_id=rt_user.app_id, alert_flags=2)
             complete_message = '\n'.join(message_lines)
-            if isinstance(incident.params, IncidentParamsFlow):
+            if isinstance(incident.params, (IncidentParamsFlow, IncidentParamsForm)):
                 try_or_defer(send_rogerthat_message, settings.sik, member, complete_message,
                              parent_message_key=incident.params.parent_message_key, json_rpc_id=guid())
             else:
@@ -120,12 +129,18 @@ def set_incident_info(topdesk_incident, incident, topdesk_settings):
     if topdesk_incident['closed']:
         incident.set_status(IncidentStatus.RESOLVED, closed_date)
     tags = []
-    for field in topdesk_settings.report_settings.type_fields:
-        value = topdesk_incident[field.property]
-        if value:
-            tags.append(IncidentTag(type=field.property, id=value['id']))
-    if not tags:
-        incident.tags.append(IncidentTag(type=IncidentTagType.CATEGORY))
+    category_id = topdesk_incident[IncidentTagType.CATEGORY].get('id')
+    if category_id:
+        incident.tags.append(IncidentTag(type=IncidentTagType.CATEGORY, id=category_id))
+    subcategory_id = topdesk_incident[IncidentTagType.SUB_CATEGORY].get('id')
+    if subcategory_id:
+        incident.tags.append(IncidentTag(type=IncidentTagType.SUB_CATEGORY, id=subcategory_id))
+    if topdesk_settings.report_settings and topdesk_settings.report_settings is not MISSING:
+        # TODO: I'm not actually sure what the point of this is
+        for field in topdesk_settings.report_settings.type_fields:
+            value = topdesk_incident[field.property]
+            if value:
+                tags.append(IncidentTag(type=field.property, id=value['id']))
     incident.tags = tags
     location_from_topdesk = _get_geo_location_from_topdesk_incident(topdesk_settings, topdesk_incident)
     if location_from_topdesk:
