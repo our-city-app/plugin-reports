@@ -19,6 +19,7 @@ import base64
 import json
 import logging
 from cStringIO import StringIO
+from mimetypes import guess_extension
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
@@ -355,13 +356,15 @@ def create_topdesk_incident_from_form(config, form_configuration, submission, fo
     incident_details.description = request_text
 
     logging.debug('Creating incident: %s', new_incident_data)
-    # raise Exception('test')
     response = topdesk_api_call(topdesk_settings, '/api/incidents', urlfetch.POST, new_incident_data)
     logging.debug('Result from server: %s', response)
 
     for i, attachment in enumerate(attachments):
+        extension = guess_extension(attachment.file_type, strict=False)
+        if extension == '.jpe':
+            extension = '.jpeg'
         deferred.defer(upload_attachment, config.id, response['id'], attachment.value,
-                       'attachment-%d' % i, attachment.file_type)
+                       'attachment-%d%s' % (i, extension), attachment.file_type)
 
     integration_params = IntegrationParamsTopdesk()
     integration_params.status = IdName.from_dict(response['processingStatus'])
